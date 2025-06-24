@@ -36,15 +36,15 @@ get_current_version() {
 increment_version() {
     local version=$1
     local type=$2
-    
+
     # Remove 'v' prefix if present
     version=${version#v}
-    
+
     IFS='.' read -ra PARTS <<< "$version"
     major=${PARTS[0]}
     minor=${PARTS[1]}
     patch=${PARTS[2]}
-    
+
     case $type in
         "major")
             major=$((major + 1))
@@ -63,7 +63,7 @@ increment_version() {
             exit 1
             ;;
     esac
-    
+
     echo "v$major.$minor.$patch"
 }
 
@@ -97,23 +97,23 @@ main() {
         show_help
         exit 0
     fi
-    
+
     local version_input=$1
     local message=${2:-""}
-    
+
     # Validate we're in a git repo
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         print_error "Not in a git repository"
         exit 1
     fi
-    
+
     # Check for uncommitted changes
     if ! git diff-index --quiet HEAD --; then
         print_error "You have uncommitted changes. Please commit or stash them first."
         git status --short
         exit 1
     fi
-    
+
     # Determine if input is version type or specific version
     local new_version
     if [[ "$version_input" =~ ^(patch|minor|major)$ ]]; then
@@ -131,26 +131,26 @@ main() {
         show_help
         exit 1
     fi
-    
+
     # Check if tag already exists
     if git tag -l | grep -q "^${new_version}$"; then
         print_error "Tag ${new_version} already exists"
         exit 1
     fi
-    
+
     current_version=$(get_current_version)
-    
+
     echo ""
     echo -e "${BLUE}📦 Release Information:${NC}"
     echo -e "Current version: ${YELLOW}$current_version${NC}"
     echo -e "New version: ${GREEN}$new_version${NC}"
-    
+
     if [ -n "$message" ]; then
         echo -e "Message: ${YELLOW}$message${NC}"
     fi
-    
+
     echo ""
-    
+
     # Show recent commits since last tag
     echo -e "${BLUE}📝 Changes since $current_version:${NC}"
     if [ "$current_version" != "v0.0.0" ]; then
@@ -158,47 +158,47 @@ main() {
     else
         git log --oneline --no-merges -10
     fi
-    
+
     echo ""
     read -p "🚀 Proceed with release? (y/N): " -n 1 -r
     echo
-    
+
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         print_warning "Release cancelled"
         exit 0
     fi
-    
+
     # Create the release
     print_status "Creating release $new_version..."
-    
+
     # Create tag with message
     if [ -n "$message" ]; then
         git tag -a "$new_version" -m "$message"
     else
         git tag -a "$new_version" -m "Release $new_version"
     fi
-    
+
     print_success "✅ Created tag $new_version"
-    
+
     # Build with new version
     print_status "🔨 Building with new version..."
     make build
-    
+
     # Test the version
     print_status "🧪 Testing version command..."
     ./gocli version
-    
+
     echo ""
     print_success "🎉 Release $new_version created successfully!"
     echo ""
     echo -e "${BLUE}📋 Next steps:${NC}"
     echo -e "  1. 🧪 Test thoroughly: ${YELLOW}./gocli --help${NC}"
     echo -e "  2. 📤 Push to remote: ${YELLOW}git push origin main --tags${NC}"
-    echo -e "  3. 🌐 Create GitHub release (optional): ${YELLOW}https://github.com/ssk-amoga/gocli/releases/new${NC}"
+    echo -e "  3. 🌐 Create GitHub release (optional): ${YELLOW}https://github.com/amoga-io/run/releases/new${NC}"
     echo -e "  4. 📢 Users can update with: ${YELLOW}gocli update${NC}"
     echo ""
     echo -e "${GREEN}🔗 Direct install URL for users:${NC}"
-    echo -e "${BLUE}bash <(curl -fsSL https://raw.githubusercontent.com/ssk-amoga/gocli/main/install.sh)${NC}"
+    echo -e "${BLUE}bash <(curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/install.sh)${NC}"
 }
 
 main "$@"

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 INSTALL_DIR="/usr/local/bin"
-REPO_URL="https://github.com/ssk-amoga/gocli.git"
+REPO_URL="https://github.com/amoga-io/run.git"
 CLONE_DIR="$HOME/.gocli"
 
 # Dependency Checks

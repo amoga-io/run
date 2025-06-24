@@ -23,7 +23,7 @@ rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 
 		if _, err := os.Stat(repoDir); os.IsNotExist(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "❌ gocli repo not found in %s\n", repoDir)
-			fmt.Fprintf(cmd.ErrOrStderr(), "💡 Try reinstalling with: bash <(curl -fsSL https://raw.githubusercontent.com/ssk-amoga/gocli/main/install.sh)\n")
+			fmt.Fprintf(cmd.ErrOrStderr(), "💡 Try reinstalling with: bash <(curl -fsSL https://raw.githubusercontent.com/amoga-io/run/install.sh)\n")
 			return
 		}
 

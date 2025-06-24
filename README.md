@@ -14,13 +14,13 @@ A simple, cross-platform CLI tool written in Go for running custom scripts and i
 To install `gocli` globally, run:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ssk-amoga/gocli/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/install.sh)
 ```
 
 Or, build from source:
 
 ```bash
-git clone https://github.com/ssk-amoga/gocli.git
+git clone https://github.com/amoga-io/run.git
 cd gocli
 go build -o gocli
 ```

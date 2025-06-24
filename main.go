@@ -3,7 +3,7 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 */
 package main
 
-import "github.com/ssk-amoga/gocli/cmd"
+import "github.com/amoga-io/run/cmd"
 
 func main() {
 	cmd.Execute()

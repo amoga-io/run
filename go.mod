@@ -1,4 +1,4 @@
-module github.com/ssk-amoga/gocli
+module github.com/amoga-io/run
 
 go 1.24.4
 

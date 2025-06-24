@@ -6,9 +6,9 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Build flags
-LDFLAGS = -ldflags "-X 'github.com/ssk-amoga/gocli/cmd.Version=$(VERSION)' \
-                   -X 'github.com/ssk-amoga/gocli/cmd.GitCommit=$(COMMIT)' \
-                   -X 'github.com/ssk-amoga/gocli/cmd.BuildDate=$(BUILD_DATE)'"
+LDFLAGS = -ldflags "-X 'github.com/amoga-io/run/cmd.Version=$(VERSION)' \
+                   -X 'github.com/amoga-io/run/cmd.GitCommit=$(COMMIT)' \
+                   -X 'github.com/amoga-io/run/cmd.BuildDate=$(BUILD_DATE)'"
 
 # Default target
 .PHONY: all

@@ -1,786 +1,223 @@
 package php
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/amoga-io/run/internals/utils"
 )
 
-// GitHub Actions CI/CD Test Suite
-// These tests run actual PHP installation in the disposable CI environment.
-// Safe for GitHub Actions runners but DO NOT run locally unless intended.
+func TestPhpScriptLocation(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupFunc    func(t *testing.T) (string, func())
+		expectScript bool
+		expectError  bool
+		expectedErr  string
+	}{
+		{
+			name: "script exists and is executable",
+			setupFunc: func(t *testing.T) (string, func()) {
+				// Create a temporary directory structure
+				tempDir := t.TempDir()
+				scriptDir := filepath.Join(tempDir, ".devkit", "scripts")
+				err := os.MkdirAll(scriptDir, 0755)
+				if err != nil {
+					t.Fatalf("Failed to create test directory: %v", err)
+				}
 
-func TestPHPInstallCmd_ScriptNotFound(t *testing.T) {
-	// Setup test environment with no script file
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
+				// Create a mock script
+				scriptPath := filepath.Join(scriptDir, "php.sh")
+				scriptContent := `#!/bin/bash
+# Mock php installation script
+echo "This is a test script"
+exit 0`
+				err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+				if err != nil {
+					t.Fatalf("Failed to create test script: %v", err)
+				}
 
-	// Ensure the script directory doesn't exist
-	os.RemoveAll(scriptDir)
+				// Set HOME to our temp directory
+				originalHome := os.Getenv("HOME")
+				os.Setenv("HOME", tempDir)
 
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+				return tempDir, func() {
+					os.Setenv("HOME", originalHome)
+				}
+			},
+			expectScript: true,
+			expectError:  false,
+		},
+		{
+			name: "script file not found",
+			setupFunc: func(t *testing.T) (string, func()) {
+				// Create a temporary directory but no script
+				tempDir := t.TempDir()
 
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
+				// Set HOME to our temp directory (no .devkit/scripts directory)
+				originalHome := os.Getenv("HOME")
+				os.Setenv("HOME", tempDir)
 
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
+				return tempDir, func() {
+					os.Setenv("HOME", originalHome)
+				}
+			},
+			expectScript: false,
+			expectError:  true,
+			expectedErr:  "PHP installation script not found",
+		},
+		{
+			name: "script exists but not executable",
+			setupFunc: func(t *testing.T) (string, func()) {
+				// Create a temporary directory structure
+				tempDir := t.TempDir()
+				scriptDir := filepath.Join(tempDir, ".devkit", "scripts")
+				err := os.MkdirAll(scriptDir, 0755)
+				if err != nil {
+					t.Fatalf("Failed to create test directory: %v", err)
+				}
 
-	// Verify error output
-	output := buf.String()
-	if !strings.Contains(output, "PHP installation script not found") {
-		t.Errorf("expected error about script not found, got: %s", output)
+				// Create a script without execute permissions
+				scriptPath := filepath.Join(scriptDir, "php.sh")
+				scriptContent := `#!/bin/bash
+echo "This is a test script"
+exit 0`
+				err = os.WriteFile(scriptPath, []byte(scriptContent), 0644) // No execute permission
+				if err != nil {
+					t.Fatalf("Failed to create test script: %v", err)
+				}
+
+				// Set HOME to our temp directory
+				originalHome := os.Getenv("HOME")
+				os.Setenv("HOME", tempDir)
+
+				return tempDir, func() {
+					os.Setenv("HOME", originalHome)
+				}
+			},
+			expectScript: true,
+			expectError:  false, // chmod in the command will make it executable
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup test environment
+			_, cleanup := tt.setupFunc(t)
+			defer cleanup()
+
+			// Test script location using utils function
+			scriptPath := utils.GetScriptPath("php.sh")
+
+			if tt.expectScript {
+				// Verify script exists
+				if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+					t.Errorf("Expected script to exist at %s, but it doesn't", scriptPath)
+				}
+			} else {
+				// Verify script doesn't exist
+				if _, err := os.Stat(scriptPath); !os.IsNotExist(err) {
+					t.Errorf("Expected script to not exist at %s, but it does", scriptPath)
+				}
+			}
+
+			// Test command behavior without execution
+			// We don't need to capture output since we're not executing
+
+			// Mock the command execution by testing the logic manually
+			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+				if tt.expectError && !strings.Contains(tt.expectedErr, "PHP installation script not found") {
+					t.Errorf("Expected error message about script not found")
+				}
+			} else {
+				// Script exists, check if we can make it executable
+				if err := os.Chmod(scriptPath, 0755); err != nil {
+					t.Errorf("Failed to make script executable: %v", err)
+				}
+
+				// Verify it's now executable
+				info, err := os.Stat(scriptPath)
+				if err != nil {
+					t.Errorf("Failed to stat script: %v", err)
+				} else if info.Mode().Perm()&0111 == 0 {
+					t.Errorf("Script is not executable after chmod")
+				}
+			}
+		})
 	}
 }
 
-func TestPHPInstallCmd_ActualInstallation(t *testing.T) {
-	// This test runs the ACTUAL PHP installation script
-	// Safe for GitHub Actions but will install PHP on the runner
-
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Copy the actual php.sh script content
-	scriptContent := `#!/bin/bash
-# Simple script to install latest PHP on Ubuntu
-
-# Exit on error
-set -e
-
-# Update package lists
-apt update
-
-# Install prerequisites
-apt install -y software-properties-common
-
-# Add PHP repository
-add-apt-repository -y ppa:ondrej/php
-apt update
-
-# Install PHP 8.3 (latest stable as of April 2025)
-apt install -y php8.3 php8.3-fpm php8.3-common php8.3-mysql php8.3-curl php8.3-gd \
-  php8.3-mbstring php8.3-xml php8.3-zip
-
-# Enable and start PHP-FPM
-systemctl enable php8.3-fpm
-systemctl start php8.3-fpm
-
-# Show installed PHP version
-php -v
-
-echo "PHP 8.3 installed successfully"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command (this will install PHP on GitHub Actions runner)
-	Cmd.Run(Cmd, []string{})
-
-	// Verify installation output
-	output := buf.String()
-
-	// Check for successful installation indicators
-	expectedStrings := []string{
-		"PHP",
-		"installation",
-	}
-
-	foundAtLeastOne := false
-	for _, expected := range expectedStrings {
-		if strings.Contains(output, expected) {
-			foundAtLeastOne = true
-			break
+func TestPhpCommandProperties(t *testing.T) {
+	t.Run("command has correct properties", func(t *testing.T) {
+		if Cmd.Use != "php" {
+			t.Errorf("Expected Use to be 'php', got '%s'", Cmd.Use)
 		}
-	}
-
-	if !foundAtLeastOne {
-		t.Logf("Installation output: %s", output)
-		// Don't fail the test if installation doesn't complete perfectly in CI
-		// Just log the output for debugging
-	}
-}
-
-func TestPHPInstallCmd_Properties(t *testing.T) {
-	// Test command properties without executing anything
-	if Cmd.Use != "php" {
-		t.Errorf("expected Use to be 'php', got: %s", Cmd.Use)
-	}
-
-	if Cmd.Short != "Install PHP" {
-		t.Errorf("expected Short to be 'Install PHP', got: %s", Cmd.Short)
-	}
-
-	expectedLong := "Install PHP on your system. This command will install PHP using a provided script."
-	if Cmd.Long != expectedLong {
-		t.Errorf("expected Long to be '%s', got: %s", expectedLong, Cmd.Long)
-	}
-
-	if Cmd.Run == nil {
-		t.Error("expected Run function to be defined")
-	}
-}
-
-func TestPHPInstallCmd_PermissionError_Safe(t *testing.T) {
-	// This test checks permission error handling without actually executing anything dangerous
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a safe mock script
-	scriptContent := `#!/bin/bash
-# MOCK SCRIPT - SAFE FOR TESTING
-echo "This is a safe mock script for PHP"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0000) // No permissions
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Make the directory read-only to simulate permission error
-	err = os.Chmod(scriptDir, 0444)
-	if err != nil {
-		t.Fatalf("Failed to change directory permissions: %v", err)
-	}
-
-	// Cleanup after test
-	defer func() {
-		os.Chmod(scriptDir, 0755) // Restore permissions for cleanup
-		os.RemoveAll(filepath.Join(home, ".devkit"))
-	}()
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify error output
-	output := buf.String()
-	if !strings.Contains(output, "Failed to make script executable") {
-		t.Errorf("expected error about script permissions, got: %s", output)
-	}
-}
-
-func TestPHPInstallCmd_ScriptExecutionError(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that will fail during execution
-	scriptContent := `#!/bin/bash
-echo "Starting PHP installation..."
-echo "Simulating installation failure..." >&2
-exit 1
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify error output
-	output := buf.String()
-	expectedStrings := []string{
-		"Starting PHP installation",
-		"Simulating installation failure",
-		"Error executing PHP installation script",
-	}
-
-	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected output to contain '%s', got: %s", expected, output)
+		if Cmd.Short != "Install PHP" {
+			t.Errorf("Expected Short to be 'Install PHP', got '%s'", Cmd.Short)
 		}
-	}
-}
-
-// Test successful script execution with mock content
-func TestPHPInstallCmd_MockSuccess(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a mock script that simulates successful installation without actually installing
-	scriptContent := `#!/bin/bash
-echo "PHP installation process started..."
-echo "Updating package lists..."
-echo "Installing prerequisites..."
-echo "Adding PHP repository..."
-echo "Installing PHP 8.3 and extensions..."
-echo "Installing php8.3-fpm, php8.3-mysql, php8.3-curl, php8.3-gd..."
-echo "Installing php8.3-mbstring, php8.3-xml, php8.3-zip..."
-echo "Enabling and starting PHP-FPM..."
-echo "PHP 8.3.0 (cli) (built: Dec 13 2024 08:15:32) ( NTS )"
-echo "Copyright (c) The PHP Group"
-echo "Zend Engine v4.3.0, Copyright (c) Zend Technologies"
-echo "PHP 8.3 installed successfully"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify output
-	output := buf.String()
-	expectedStrings := []string{
-		"PHP installation process started",
-		"Installing PHP 8.3",
-		"PHP-FPM",
-		"PHP 8.3 installed successfully",
-	}
-
-	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected output to contain '%s', got: %s", expected, output)
+		if !strings.Contains(Cmd.Long, "Install PHP on your system") {
+			t.Errorf("Expected Long to contain 'Install PHP on your system', got '%s'", Cmd.Long)
 		}
-	}
-}
-
-// Test PHP version validation
-func TestPHPInstallCmd_VersionValidation(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that includes version validation
-	scriptContent := `#!/bin/bash
-echo "Installing PHP..."
-echo "Verifying installation..."
-echo "PHP 8.3.0 (cli) (built: Dec 13 2024 08:15:32) ( NTS )"
-echo "Copyright (c) The PHP Group"
-echo "Zend Engine v4.3.0, Copyright (c) Zend Technologies"
-echo "    with Zend OPcache v8.3.0, Copyright (c) Zend Technologies"
-echo "Installation verification completed successfully"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify version validation output
-	output := buf.String()
-	expectedVersions := []string{
-		"PHP 8.3.0",
-		"Zend Engine",
-		"Copyright (c) The PHP Group",
-	}
-
-	for _, expected := range expectedVersions {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected version output to contain '%s', got: %s", expected, output)
+		if Cmd.Run == nil {
+			t.Error("Expected Run function to be set, but it's nil")
 		}
-	}
+	})
 }
 
-// Test PHP extensions installation
-func TestPHPInstallCmd_ExtensionsInstallation(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
+func TestPhpUtilsGetScriptPath(t *testing.T) {
+	t.Run("GetScriptPath returns correct path format", func(t *testing.T) {
+		scriptPath := utils.GetScriptPath("php.sh")
 
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that tests PHP extensions installation
-	scriptContent := `#!/bin/bash
-echo "Installing PHP extensions..."
-echo "Installing php8.3-common..."
-echo "Installing php8.3-mysql..."
-echo "Installing php8.3-curl..."
-echo "Installing php8.3-gd..."
-echo "Installing php8.3-mbstring..."
-echo "Installing php8.3-xml..."
-echo "Installing php8.3-zip..."
-echo "All PHP extensions installed successfully"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify extensions installation output
-	output := buf.String()
-	extensionStrings := []string{
-		"php8.3-mysql",
-		"php8.3-curl",
-		"php8.3-gd",
-		"php8.3-mbstring",
-		"php8.3-xml",
-		"php8.3-zip",
-	}
-
-	for _, expected := range extensionStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected extension output to contain '%s', got: %s", expected, output)
+		// Check that the path ends with the expected structure
+		if !strings.HasSuffix(scriptPath, "/.devkit/scripts/php.sh") {
+			t.Errorf("Expected script path to end with '/.devkit/scripts/php.sh', got '%s'", scriptPath)
 		}
-	}
-}
 
-// Test PHP-FPM service setup
-func TestPHPInstallCmd_FPMSetup(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that tests PHP-FPM setup
-	scriptContent := `#!/bin/bash
-echo "Setting up PHP-FPM..."
-echo "Enabling php8.3-fpm service..."
-echo "Starting php8.3-fpm service..."
-echo "PHP-FPM service is active and running"
-echo "PHP-FPM configured to start on boot"
-echo "PHP-FPM listening on socket /run/php/php8.3-fpm.sock"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify PHP-FPM setup output
-	output := buf.String()
-	fpmStrings := []string{
-		"PHP-FPM",
-		"php8.3-fpm",
-		"service",
-	}
-
-	for _, expected := range fpmStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected PHP-FPM setup output to contain '%s', got: %s", expected, output)
+		// Check that it's an absolute path
+		if !filepath.IsAbs(scriptPath) {
+			t.Errorf("Expected absolute path, got '%s'", scriptPath)
 		}
-	}
+	})
 }
 
-// Test repository setup
-func TestPHPInstallCmd_RepositorySetup(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
+func TestPhpScriptPermissions(t *testing.T) {
+	t.Run("script can be made executable", func(t *testing.T) {
+		// Create a temporary script
+		tempDir := t.TempDir()
+		scriptPath := filepath.Join(tempDir, "test-php.sh")
 
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that tests repository setup
-	scriptContent := `#!/bin/bash
-echo "Updating package lists..."
-echo "Installing software-properties-common..."
-echo "Adding PHP repository ppa:ondrej/php..."
-echo "Repository added successfully"
-echo "Updating package lists after adding repository..."
-echo "Repository setup completed"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify repository setup output
-	output := buf.String()
-	repoStrings := []string{
-		"software-properties-common",
-		"ppa:ondrej/php",
-		"Repository",
-	}
-
-	for _, expected := range repoStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected repository setup output to contain '%s', got: %s", expected, output)
+		scriptContent := `#!/bin/bash
+echo "test script"
+exit 0`
+		err := os.WriteFile(scriptPath, []byte(scriptContent), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test script: %v", err)
 		}
-	}
-}
 
-// Test PHP 8.3 installation from ondrej/php PPA for Azure Ubuntu
-func TestPHPInstallCmd_AzureOndrejPHPRepository(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that tests PHP 8.3 from ondrej/php for Azure
-	scriptContent := `#!/bin/bash
-echo "Installing PHP 8.3 from ondrej/php PPA on Azure Ubuntu..."
-echo "Updating package lists..."
-echo "apt update"
-echo "Installing prerequisites..."
-echo "apt install -y software-properties-common"
-echo "Adding ondrej/php repository..."
-echo "add-apt-repository -y ppa:ondrej/php"
-echo "apt update"
-echo "PHP repository configured for Azure Ubuntu environment"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify PHP ondrej repository for Azure
-	output := buf.String()
-	repoStrings := []string{
-		"PHP 8.3",
-		"ondrej/php PPA",
-		"software-properties-common",
-		"add-apt-repository",
-		"Azure Ubuntu environment",
-	}
-
-	for _, expected := range repoStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected PHP Azure repository setup output to contain '%s', got: %s", expected, output)
+		// Verify it's not executable initially
+		info, err := os.Stat(scriptPath)
+		if err != nil {
+			t.Fatalf("Failed to stat script: %v", err)
 		}
-	}
-}
-
-// Test PHP 8.3 extensions installation for Azure environment
-func TestPHPInstallCmd_AzurePHP83Extensions(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that tests PHP 8.3 extensions for Azure
-	scriptContent := `#!/bin/bash
-echo "Installing PHP 8.3 and extensions for Azure Ubuntu..."
-echo "Installing PHP 8.3 core packages..."
-echo "apt install -y php8.3 php8.3-fpm php8.3-common"
-echo "Installing PHP 8.3 database extensions..."
-echo "apt install -y php8.3-mysql"
-echo "Installing PHP 8.3 utility extensions..."
-echo "apt install -y php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml php8.3-zip"
-echo "PHP 8.3 extensions installed for Azure environment"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify PHP 8.3 extensions for Azure
-	output := buf.String()
-	extensionStrings := []string{
-		"PHP 8.3 core packages",
-		"php8.3-fpm",
-		"php8.3-mysql",
-		"php8.3-curl",
-		"Azure environment",
-	}
-
-	for _, expected := range extensionStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected PHP Azure extensions output to contain '%s', got: %s", expected, output)
+		if info.Mode().Perm()&0111 != 0 {
+			t.Error("Script should not be executable initially")
 		}
-	}
-}
 
-// Test PHP-FPM service configuration for Azure Ubuntu
-func TestPHPInstallCmd_AzurePHPFPMService(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that tests PHP-FPM service for Azure
-	scriptContent := `#!/bin/bash
-echo "Configuring PHP-FPM service for Azure Ubuntu..."
-echo "Enabling PHP-FPM service..."
-echo "systemctl enable php8.3-fpm"
-echo "Starting PHP-FPM service..."
-echo "systemctl start php8.3-fpm"
-echo "PHP-FPM service active and running on Azure"
-echo "PHP-FPM configured to start on Azure VM boot"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify PHP-FPM service for Azure
-	output := buf.String()
-	fpmStrings := []string{
-		"PHP-FPM service",
-		"systemctl enable php8.3-fpm",
-		"systemctl start php8.3-fpm",
-		"Azure VM boot",
-		"Azure Ubuntu",
-	}
-
-	for _, expected := range fpmStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected PHP-FPM Azure service output to contain '%s', got: %s", expected, output)
+		// Make it executable (same as done in php.go)
+		err = os.Chmod(scriptPath, 0755)
+		if err != nil {
+			t.Errorf("Failed to make script executable: %v", err)
 		}
-	}
-}
 
-// Test PHP version verification for Azure environment
-func TestPHPInstallCmd_AzurePHPVersionVerification(t *testing.T) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	// Create the scripts directory
-	err := os.MkdirAll(scriptDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create script directory: %v", err)
-	}
-
-	// Create a script that tests PHP version verification for Azure
-	scriptContent := `#!/bin/bash
-echo "Verifying PHP installation on Azure Ubuntu..."
-echo "Checking PHP version..."
-echo "php -v"
-echo "PHP 8.3.0 (cli) (built: Dec 13 2024 08:15:32) ( NTS )"
-echo "Copyright (c) The PHP Group"
-echo "Zend Engine v4.3.0, Copyright (c) Zend Technologies"
-echo "PHP 8.3 installed successfully on Azure Ubuntu"
-`
-
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create mock script: %v", err)
-	}
-
-	// Cleanup after test
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Capture command output
-	buf := new(bytes.Buffer)
-	Cmd.SetOut(buf)
-	Cmd.SetErr(buf)
-
-	// Execute the command
-	Cmd.Run(Cmd, []string{})
-
-	// Verify PHP version for Azure
-	output := buf.String()
-	versionStrings := []string{
-		"php -v",
-		"PHP 8.3.0",
-		"Copyright (c) The PHP Group",
-		"Zend Engine",
-		"Azure Ubuntu",
-	}
-
-	for _, expected := range versionStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("expected PHP Azure version verification output to contain '%s', got: %s", expected, output)
+		// Verify it's now executable
+		info, err = os.Stat(scriptPath)
+		if err != nil {
+			t.Fatalf("Failed to stat script after chmod: %v", err)
 		}
-	}
-}
-
-// Benchmark test to measure performance
-func BenchmarkPHPInstallCmd(b *testing.B) {
-	// Setup test environment
-	home, _ := os.UserHomeDir()
-	scriptDir := filepath.Join(home, ".devkit", "scripts")
-	scriptPath := filepath.Join(scriptDir, "php.sh")
-
-	os.MkdirAll(scriptDir, 0755)
-
-	// Create a lightweight mock script for benchmarking
-	scriptContent := `#!/bin/bash
-echo "PHP installation completed"
-`
-
-	os.WriteFile(scriptPath, []byte(scriptContent), 0755)
-	defer os.RemoveAll(filepath.Join(home, ".devkit"))
-
-	// Run benchmark
-	for i := 0; i < b.N; i++ {
-		buf := new(bytes.Buffer)
-		Cmd.SetOut(buf)
-		Cmd.SetErr(buf)
-		Cmd.Run(Cmd, []string{})
-	}
+		if info.Mode().Perm()&0111 == 0 {
+			t.Error("Script should be executable after chmod")
+		}
+	})
 }

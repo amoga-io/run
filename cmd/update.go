@@ -12,18 +12,18 @@ import (
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update gocli by pulling the latest changes from GitHub",
-	Long: `Update gocli to the latest version by pulling changes from GitHub,
+	Short: "Update devkit by pulling the latest changes from GitHub",
+	Long: `Update devkit to the latest version by pulling changes from GitHub,
 rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("🔍 Checking for updates...")
 
 		// Path to the cloned repository
-		repoDir := filepath.Join(os.Getenv("HOME"), ".gocli")
+		repoDir := filepath.Join(os.Getenv("HOME"), ".devkit")
 
 		if _, err := os.Stat(repoDir); os.IsNotExist(err) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "❌ gocli repo not found in %s\n", repoDir)
-			fmt.Fprintf(cmd.ErrOrStderr(), "💡 Try reinstalling with: bash <(curl -fsSL https://raw.githubusercontent.com/amoga-io/run/install.sh)\n")
+			fmt.Fprintf(cmd.ErrOrStderr(), "❌ devkit repo not found in %s\n", repoDir)
+			fmt.Fprintf(cmd.ErrOrStderr(), "💡 Try reinstalling with: bash <(curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/install.sh)\n")
 			return
 		}
 
@@ -39,7 +39,7 @@ rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 		gitPull.Stderr = cmd.ErrOrStderr()
 
 		if err := gitPull.Run(); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error updating gocli: %v\n", err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error updating devkit: %v\n", err)
 			return
 		}
 
@@ -50,7 +50,7 @@ rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 
 		// Check if there were actually any updates
 		if beforeHash == afterHash {
-			fmt.Println("✅ gocli is already up to date!")
+			fmt.Println("✅ devkit is already up to date!")
 
 			// Show current version information
 			if version, commit, err := getVersionFromGit(repoDir); err == nil {
@@ -81,10 +81,10 @@ rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 			fmt.Print(string(changelog))
 		}
 
-		fmt.Println("gocli repository updated successfully!")
+		fmt.Println("devkit repository updated successfully!")
 
 		// Rebuild the CLI after pulling updates
-		fmt.Println("🔨 Rebuilding gocli...")
+		fmt.Println("🔨 Rebuilding devkit...")
 
 		// Check if Makefile exists and use it for better version handling
 		makefilePath := filepath.Join(repoDir, "Makefile")
@@ -95,7 +95,7 @@ rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 			buildCmd = exec.Command("make", "build")
 		} else {
 			// Fallback to go build
-			buildCmd = exec.Command("go", "build", "-o", "gocli")
+			buildCmd = exec.Command("go", "build", "-o", "devkit")
 		}
 
 		buildCmd.Dir = repoDir
@@ -103,22 +103,22 @@ rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 		buildCmd.Stderr = cmd.ErrOrStderr()
 
 		if err := buildCmd.Run(); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error rebuilding gocli: %v\n", err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error rebuilding devkit: %v\n", err)
 			return
 		}
 
 		// Create a temporary binary name to avoid "text file busy" error
-		tempBinary := filepath.Join("/usr/local/bin", "gocli.new")
-		finalBinary := "/usr/local/bin/gocli"
+		tempBinary := filepath.Join("/usr/local/bin", "devkit.new")
+		finalBinary := "/usr/local/bin/devkit"
 
 		// First, copy to a temporary location
 		fmt.Println("📦 Installing updated binary...")
-		copyCmd := exec.Command("sudo", "cp", filepath.Join(repoDir, "gocli"), tempBinary)
+		copyCmd := exec.Command("sudo", "cp", filepath.Join(repoDir, "devkit"), tempBinary)
 		copyCmd.Stdout = cmd.OutOrStdout()
 		copyCmd.Stderr = cmd.ErrOrStderr()
 
 		if err := copyCmd.Run(); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error copying updated gocli: %v\n", err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error copying updated devkit: %v\n", err)
 			return
 		}
 
@@ -138,14 +138,14 @@ rebuilding the binary, and installing it. This is similar to 'brew upgrade'.`,
 		moveCmd.Stderr = cmd.ErrOrStderr()
 
 		if err := moveCmd.Run(); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error installing updated gocli: %v\n", err)
+			fmt.Fprintf(cmd.ErrOrStderr(), "❌ Error installing updated devkit: %v\n", err)
 			// Clean up the temporary file if move failed
 			exec.Command("sudo", "rm", "-f", tempBinary).Run()
 			return
 		}
 
-		fmt.Println("🚀 gocli update complete!")
-		fmt.Println("✨ Run 'gocli version' to see the new version")
+		fmt.Println("🚀 devkit update complete!")
+		fmt.Println("✨ Run 'devkit version' to see the new version")
 	},
 }
 

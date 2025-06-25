@@ -12,9 +12,9 @@ import (
 
 // Version information - can be set via build flags
 var (
-	Version   = "v1.0.0"  // Default version
-	GitCommit = "unknown" // Git commit hash
-	BuildDate = "unknown" // Build date
+	Version   = "v0.1.0" // Default version, will be overridden by build flags
+	GitCommit = "unknown"
+	BuildDate = "unknown"
 )
 
 // getVersionFromGit gets the version from git tags in the repo directory
@@ -52,9 +52,15 @@ func getVersionFromGit(repoDir string) (string, string, error) {
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show the current version of gocli",
+	Short: "Show the current version of devkit",
 	Long:  `Display version information including semantic version, git commit, and build details.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// ANSI color codes
+		cyan := "\033[1;36m"
+		green := "\033[0;32m"
+		yellow := "\033[1;33m"
+		reset := "\033[0m"
+
 		var repoDir string
 
 		// First try current directory (for development)
@@ -66,40 +72,37 @@ var versionCmd = &cobra.Command{
 
 		// Fallback to installed location
 		if repoDir == "" {
-			repoDir = filepath.Join(os.Getenv("HOME"), ".gocli")
+			repoDir = filepath.Join(os.Getenv("HOME"), ".devkit")
 		}
 
 		// Try to get version from git repository
 		if _, err := os.Stat(filepath.Join(repoDir, ".git")); err == nil {
 			if gitVersion, gitCommit, err := getVersionFromGit(repoDir); err == nil {
-				fmt.Printf("gocli version %s\n", gitVersion)
-				fmt.Printf("Git commit: %s\n", gitCommit)
-
-				// Show build date if available
+				fmt.Printf("%sdevkit %s%s\n", cyan, gitVersion, reset)
+				fmt.Printf("%sCommit:%s %s\n", yellow, reset, gitCommit)
 				if BuildDate != "unknown" {
-					fmt.Printf("Build date: %s\n", BuildDate)
+					fmt.Printf("%sBuilt:%s %s\n", yellow, reset, BuildDate)
 				}
-
-				// Check for uncommitted changes
 				statusCmd := exec.Command("git", "-C", repoDir, "status", "--porcelain")
 				if output, err := statusCmd.Output(); err == nil && len(output) > 0 {
-					fmt.Println("Status: dirty (uncommitted changes)")
+					fmt.Printf("%sStatus:%s dirty (uncommitted changes)\n", yellow, reset)
 				} else {
-					fmt.Println("Status: clean")
+					fmt.Printf("%sStatus:%s clean\n", yellow, reset)
 				}
+				fmt.Printf("%shttps://github.com/amoga-io/run%s\n", green, reset)
 				return
 			}
 		}
 
 		// Fallback to compiled-in version
-		fmt.Printf("gocli version %s\n", Version)
+		fmt.Printf("%sdevkit %s%s\n", cyan, Version, reset)
 		if GitCommit != "unknown" {
-			fmt.Printf("Git commit: %s\n", GitCommit)
+			fmt.Printf("%sCommit:%s %s\n", yellow, reset, GitCommit)
 		}
 		if BuildDate != "unknown" {
-			fmt.Printf("Build date: %s\n", BuildDate)
+			fmt.Printf("%sBuilt:%s %s\n", yellow, reset, BuildDate)
 		}
-		fmt.Println("Note: Repository not found, showing built-in version")
+		fmt.Printf("%shttps://github.com/amoga-io/run%s\n", green, reset)
 	},
 }
 

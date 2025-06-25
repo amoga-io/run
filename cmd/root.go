@@ -6,12 +6,13 @@ package cmd
 import (
 	"os"
 
+	"github.com/amoga-io/run/cmd/run"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:     "gocli",
+	Use:     "devkit",
 	Short:   "A CLI tool for running scripts",
 	Version: Version,
 
@@ -31,11 +32,13 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.AddCommand(run.Cmd)
+
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.gocli.yaml)")
+	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.devkit.yaml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

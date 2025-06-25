@@ -1,6 +1,6 @@
-# gocli
+# devkit
 
-A simple, cross-platform CLI tool written in Go for running custom scripts and installing packages from the terminal. Built with the Cobra CLI framework, `gocli` is designed to be easily extensible and user-friendly.
+A simple, cross-platform CLI tool written in Go for running custom scripts and installing packages from the terminal. Built with the Cobra CLI framework, `devkit` is designed to be easily extensible and user-friendly.
 
 ## Features
 
@@ -11,7 +11,7 @@ A simple, cross-platform CLI tool written in Go for running custom scripts and i
 
 ## Installation
 
-To install `gocli` globally, run:
+To install `devkit` globally, run:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/install.sh)
@@ -21,8 +21,8 @@ Or, build from source:
 
 ```bash
 git clone https://github.com/amoga-io/run.git
-cd gocli
-go build -o gocli
+cd devkit
+go build -o devkit
 ```
 
 ## Usage
@@ -30,19 +30,19 @@ go build -o gocli
 ### Run a script
 
 ```bash
-gocli run hello -a "World"
+devkit run hello -a "World"
 ```
 
 ### Install Neofetch
 
 ```bash
-gocli install neofetch
+devkit install neofetch
 ```
 
 ### Show help
 
 ```bash
-gocli --help
+devkit --help
 ```
 
 ## Project Structure
@@ -63,20 +63,20 @@ gocli --help
 
 ## Uninstallation
 
-To completely remove `gocli` from your system:
+To completely remove `devkit` from your system:
 
-1. Delete the `gocli` binary:
+1. Delete the `devkit` binary:
 
    ```bash
-   rm -f $(which gocli)
+   rm -f $(which devkit)
    # or
-    rm -f /usr/local/bin/gocli
+    rm -f /usr/local/bin/devkit
    ```
 
 2. (Optional) Remove the cloned repository:
 
    ```bash
-   rm -rf ~/.gocli
+   rm -rf ~/.devkit
    ```
 
 ## Contributing

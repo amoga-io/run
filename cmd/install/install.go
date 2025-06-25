@@ -9,6 +9,7 @@ import (
 	"github.com/amoga-io/run/cmd/install/php"
 	"github.com/amoga-io/run/cmd/install/pm2"
 	"github.com/amoga-io/run/cmd/install/postgres"
+	"github.com/amoga-io/run/cmd/install/python"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +31,7 @@ func init() {
 	Cmd.AddCommand(php.Cmd)
 	Cmd.AddCommand(pm2.Cmd)
 	Cmd.AddCommand(postgres.Cmd)
+	Cmd.AddCommand(python.Cmd)
 
 	// No parent to add to here; will be added in root.go
 }

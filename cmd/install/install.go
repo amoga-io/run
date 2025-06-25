@@ -7,6 +7,7 @@ import (
 	"github.com/amoga-io/run/cmd/install/nginx"
 	"github.com/amoga-io/run/cmd/install/node"
 	"github.com/amoga-io/run/cmd/install/php"
+	"github.com/amoga-io/run/cmd/install/pm2"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +27,7 @@ func init() {
 	Cmd.AddCommand(nginx.Cmd)
 	Cmd.AddCommand(node.Cmd)
 	Cmd.AddCommand(php.Cmd)
+	Cmd.AddCommand(pm2.Cmd)
 
 	// No parent to add to here; will be added in root.go
 }

@@ -1,4 +1,4 @@
-package install
+package docker
 
 import (
 	"bytes"
@@ -25,11 +25,11 @@ func TestDockerInstallCmd_ScriptNotFound(t *testing.T) {
 
 	// Capture command output
 	buf := new(bytes.Buffer)
-	DockerInstallCmd.SetOut(buf)
-	DockerInstallCmd.SetErr(buf)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
 
 	// Execute the command
-	DockerInstallCmd.Run(DockerInstallCmd, []string{})
+	Cmd.Run(Cmd, []string{})
 
 	// Verify error output
 	output := buf.String()
@@ -105,11 +105,11 @@ docker compose version
 
 	// Capture command output
 	buf := new(bytes.Buffer)
-	DockerInstallCmd.SetOut(buf)
-	DockerInstallCmd.SetErr(buf)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
 
 	// Execute the command (this will install Docker on GitHub Actions runner)
-	DockerInstallCmd.Run(DockerInstallCmd, []string{})
+	Cmd.Run(Cmd, []string{})
 
 	// Verify installation output
 	output := buf.String()
@@ -137,38 +137,36 @@ docker compose version
 
 func TestDockerInstallCmd_Properties(t *testing.T) {
 	// Test command properties without executing anything
-	if DockerInstallCmd.Use != "docker" {
-		t.Errorf("expected Use to be 'docker', got: %s", DockerInstallCmd.Use)
+	if Cmd.Use != "docker" {
+		t.Errorf("expected Use to be 'docker', got: %s", Cmd.Use)
 	}
 
-	if DockerInstallCmd.Short != "Install Docker" {
-		t.Errorf("expected Short to be 'Install Docker', got: %s", DockerInstallCmd.Short)
+	if Cmd.Short != "Install Docker" {
+		t.Errorf("expected Short to be 'Install Docker', got: %s", Cmd.Short)
 	}
 
-	expectedLong := "Install Docker on your system. This command will guide you through the installation process."
-	if DockerInstallCmd.Long != expectedLong {
-		t.Errorf("expected Long to be '%s', got: %s", expectedLong, DockerInstallCmd.Long)
+	expectedLong := "Install Docker on your system. This command will install Docker using a provided script."
+	if Cmd.Long != expectedLong {
+		t.Errorf("expected Long to be '%s', got: %s", expectedLong, Cmd.Long)
 	}
 
-	if DockerInstallCmd.Run == nil {
+	if Cmd.Run == nil {
 		t.Error("expected Run function to be defined")
 	}
 }
 
 func TestDockerInstallCmd_Integration(t *testing.T) {
 	// Test that the command is properly added to the install command
-	// This tests the init() function behavior without executing scripts
+	// This tests the integration with the parent install command
 
-	found := false
-	for _, cmd := range Cmd.Commands() {
-		if cmd.Use == "docker" {
-			found = true
-			break
-		}
+	// Note: This test verifies the command properties exist
+	// The actual parent-child relationship is tested in the install package
+	if Cmd.Use != "docker" {
+		t.Error("expected docker command to have correct Use property")
 	}
 
-	if !found {
-		t.Error("expected docker command to be added to install command")
+	if Cmd.Short == "" {
+		t.Error("expected docker command to have Short description")
 	}
 }
 
@@ -210,11 +208,11 @@ echo "This is a safe mock script"
 
 	// Capture command output
 	buf := new(bytes.Buffer)
-	DockerInstallCmd.SetOut(buf)
-	DockerInstallCmd.SetErr(buf)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
 
 	// Execute the command
-	DockerInstallCmd.Run(DockerInstallCmd, []string{})
+	Cmd.Run(Cmd, []string{})
 
 	// Verify error output
 	output := buf.String()
@@ -243,8 +241,8 @@ echo "Docker installation completed"
 	// Run benchmark
 	for i := 0; i < b.N; i++ {
 		buf := new(bytes.Buffer)
-		DockerInstallCmd.SetOut(buf)
-		DockerInstallCmd.SetErr(buf)
-		DockerInstallCmd.Run(DockerInstallCmd, []string{})
+		Cmd.SetOut(buf)
+		Cmd.SetErr(buf)
+		Cmd.Run(Cmd, []string{})
 	}
 }

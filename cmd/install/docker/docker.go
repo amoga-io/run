@@ -1,4 +1,4 @@
-package install
+package docker
 
 import (
 	"fmt"
@@ -9,10 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var DockerInstallCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "docker",
 	Short: "Install Docker",
-	Long:  `Install Docker on your system. This command will guide you through the installation process.`,
+	Long:  `Install Docker on your system. This command will install Docker using a provided script.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		println("Docker installation process started...")
 
@@ -41,5 +41,4 @@ var DockerInstallCmd = &cobra.Command{
 func init() {
 	// No parent to add to here; will be added in root.go
 	// This command is a subcommand of the install command
-	Cmd.AddCommand(DockerInstallCmd)
 }

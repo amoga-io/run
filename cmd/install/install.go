@@ -3,6 +3,8 @@ package install
 import (
 	"fmt"
 
+	"github.com/amoga-io/run/cmd/install/docker"
+	"github.com/amoga-io/run/cmd/install/nginx"
 	"github.com/spf13/cobra"
 )
 
@@ -18,5 +20,8 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
+	Cmd.AddCommand(docker.Cmd)
+	Cmd.AddCommand(nginx.Cmd)
+
 	// No parent to add to here; will be added in root.go
 }

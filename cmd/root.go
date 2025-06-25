@@ -6,6 +6,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/amoga-io/run/cmd/install"
 	"github.com/amoga-io/run/cmd/run"
 	"github.com/spf13/cobra"
 )
@@ -33,6 +34,7 @@ func Execute() {
 
 func init() {
 	rootCmd.AddCommand(run.Cmd)
+	rootCmd.AddCommand(install.Cmd)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,

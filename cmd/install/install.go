@@ -5,6 +5,7 @@ import (
 
 	"github.com/amoga-io/run/cmd/install/docker"
 	"github.com/amoga-io/run/cmd/install/nginx"
+	"github.com/amoga-io/run/cmd/install/node"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +23,7 @@ var Cmd = &cobra.Command{
 func init() {
 	Cmd.AddCommand(docker.Cmd)
 	Cmd.AddCommand(nginx.Cmd)
+	Cmd.AddCommand(node.Cmd)
 
 	// No parent to add to here; will be added in root.go
 }

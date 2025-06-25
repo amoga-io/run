@@ -20,6 +20,7 @@ var Cmd = &cobra.Command{
 		scriptPath := utils.GetScriptPath("node.sh")
 		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Node.js installation script not found at %s\n", scriptPath)
+			return
 		}
 
 		if err := os.Chmod(scriptPath, 0755); err != nil {

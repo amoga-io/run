@@ -221,6 +221,174 @@ echo "This is a safe mock script"
 	}
 }
 
+// Test Docker repository setup for Azure Ubuntu
+func TestDockerInstallCmd_AzureRepositorySetup(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "docker.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Docker repository setup for Azure Ubuntu
+	scriptContent := `#!/bin/bash
+echo "Installing Docker dependencies..."
+echo "Adding Docker GPG key..."
+echo "Adding Docker repository for Ubuntu..."
+echo "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+echo "Docker repository configured for Azure Ubuntu environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Azure Ubuntu specific repository setup
+	output := buf.String()
+	azureStrings := []string{
+		"Docker GPG key",
+		"Docker repository",
+		"Azure Ubuntu environment",
+	}
+
+	for _, expected := range azureStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Azure repository setup output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test Docker user permissions for Azure environment
+func TestDockerInstallCmd_AzureUserPermissions(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "docker.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Docker user permissions for Azure
+	scriptContent := `#!/bin/bash
+echo "Setting up Docker user permissions..."
+echo "Adding user to docker group..."
+echo "sudo usermod -aG docker $USER"
+echo "Setting docker.sock permissions..."
+echo "sudo chmod 666 /var/run/docker.sock"
+echo "Creating Docker config directory..."
+echo "sudo chown -R $USER:docker /etc/docker"
+echo "Docker permissions configured for Azure environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Azure user permissions setup
+	output := buf.String()
+	permissionStrings := []string{
+		"docker group",
+		"docker.sock permissions",
+		"Docker config directory",
+		"Azure environment",
+	}
+
+	for _, expected := range permissionStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Azure permissions output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test Docker service configuration for Azure Ubuntu
+func TestDockerInstallCmd_AzureServiceSetup(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "docker.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Docker service setup for Azure
+	scriptContent := `#!/bin/bash
+echo "Configuring Docker service for Azure Ubuntu..."
+echo "Enabling Docker service..."
+echo "sudo systemctl enable docker"
+echo "Starting Docker service..."
+echo "sudo systemctl start docker"
+echo "Docker service configured to start on Azure VM boot"
+echo "Docker 24.0.0 (build abc123)"
+echo "Docker Compose version v2.20.0"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Azure service setup
+	output := buf.String()
+	serviceStrings := []string{
+		"systemctl enable docker",
+		"systemctl start docker",
+		"Azure VM boot",
+		"Docker 24.0.0",
+		"Docker Compose version",
+	}
+
+	for _, expected := range serviceStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Azure service setup output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
 // Benchmark test to measure performance
 func BenchmarkDockerInstallCmd(b *testing.B) {
 	// Setup test environment

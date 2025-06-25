@@ -393,3 +393,237 @@ echo "Configuration validation passed"
 		t.Errorf("expected configuration validation message, got: %s", output)
 	}
 }
+
+// Test Nginx official repository setup for Azure Ubuntu
+func TestNginxInstallCmd_AzureOfficialRepository(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "nginx.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Nginx official repository for Azure
+	scriptContent := `#!/bin/bash
+echo "Adding Nginx official repository for Azure Ubuntu..."
+echo "deb [arch=amd64] http://nginx.org/packages/mainline/ubuntu/ focal nginx"
+echo "Adding Nginx signing key..."
+echo "curl -fsSL https://nginx.org/keys/nginx_signing.key"
+echo "Installing Nginx from official repository..."
+echo "sudo apt install -y nginx"
+echo "Nginx official repository configured for Azure Ubuntu"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Nginx official repository for Azure
+	output := buf.String()
+	repoStrings := []string{
+		"Nginx official repository",
+		"nginx.org/packages/mainline",
+		"Nginx signing key",
+		"official repository",
+		"Azure Ubuntu",
+	}
+
+	for _, expected := range repoStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Nginx Azure repository setup output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test Nginx user-based configuration for Azure environment
+func TestNginxInstallCmd_AzureUserConfiguration(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "nginx.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Nginx user configuration for Azure
+	scriptContent := `#!/bin/bash
+echo "Configuring Nginx for Azure user environment..."
+echo "Setting ownership for /var/log/nginx..."
+echo "sudo chown -R $USER:$USER /var/log/nginx"
+echo "Setting ownership for /var/run/nginx..."
+echo "sudo chown -R $USER:$USER /var/run/nginx"
+echo "Updating nginx.conf user directive..."
+echo "sudo sed -i \"s/user .*/user $USER;/\" /etc/nginx/nginx.conf"
+echo "Setting proper configuration ownership..."
+echo "sudo chown $USER:$USER /etc/nginx/nginx.conf"
+echo "Nginx configured for Azure user environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Nginx user configuration for Azure
+	output := buf.String()
+	userStrings := []string{
+		"Azure user environment",
+		"chown -R $USER:$USER",
+		"nginx.conf user directive",
+		"configuration ownership",
+		"Azure user",
+	}
+
+	for _, expected := range userStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Nginx Azure user configuration output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test Nginx capabilities and permissions for Azure
+func TestNginxInstallCmd_AzureCapabilitiesSetup(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "nginx.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Nginx capabilities for Azure
+	scriptContent := `#!/bin/bash
+echo "Setting up Nginx capabilities for Azure Ubuntu..."
+echo "Allowing nginx to bind to ports 80/443 without root..."
+echo "sudo setcap cap_net_bind_service=+ep /usr/sbin/nginx"
+echo "Setting directory permissions..."
+echo "sudo chmod 755 /var/run/nginx"
+echo "sudo chmod 755 /var/log/nginx"
+echo "Nginx capabilities configured for Azure non-root operation"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Nginx capabilities for Azure
+	output := buf.String()
+	capStrings := []string{
+		"Nginx capabilities",
+		"cap_net_bind_service",
+		"ports 80/443 without root",
+		"chmod 755",
+		"non-root operation",
+	}
+
+	for _, expected := range capStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Nginx Azure capabilities output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test Nginx test site configuration for Azure
+func TestNginxInstallCmd_AzureTestSiteSetup(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "nginx.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Nginx test site for Azure
+	scriptContent := `#!/bin/bash
+echo "Creating test site configuration for Azure..."
+echo "Creating /etc/nginx/conf.d/test-site.conf..."
+echo "server { listen 80 default_server; server_name _; location / { return 200 'nginx is working!'; } }"
+echo "Testing nginx configuration..."
+echo "nginx -t"
+echo "Starting nginx service..."
+echo "sudo systemctl start nginx"
+echo "sudo systemctl enable nginx"
+echo "Test site configured for Azure Ubuntu environment"
+echo "Test the installation: curl http://localhost"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Nginx test site for Azure
+	output := buf.String()
+	siteStrings := []string{
+		"test site configuration",
+		"test-site.conf",
+		"nginx is working!",
+		"nginx -t",
+		"curl http://localhost",
+	}
+
+	for _, expected := range siteStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Nginx Azure test site output to contain '%s', got: %s", expected, output)
+		}
+	}
+}

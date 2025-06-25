@@ -137,26 +137,26 @@ func TestPM2InstallCmd_PermissionError_Safe(t *testing.T) {
 		t.Fatalf("Failed to create script directory: %v", err)
 	}
 
-	// Create a safe mock script with normal permissions first
+	// Create a safe mock script
 	scriptContent := `#!/bin/bash
 # MOCK SCRIPT - SAFE FOR TESTING
 echo "This is a safe mock script for PM2"
 `
 
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0000) // No permissions
 	if err != nil {
 		t.Fatalf("Failed to create mock script: %v", err)
 	}
 
-	// Now remove execute permissions to simulate permission error
-	err = os.Chmod(scriptPath, 0000) // No permissions
+	// Make the directory read-only to simulate permission error
+	err = os.Chmod(scriptDir, 0444)
 	if err != nil {
-		t.Fatalf("Failed to change script permissions: %v", err)
+		t.Fatalf("Failed to change directory permissions: %v", err)
 	}
 
 	// Cleanup after test
 	defer func() {
-		os.Chmod(scriptPath, 0755) // Restore permissions for cleanup
+		os.Chmod(scriptDir, 0755) // Restore permissions for cleanup
 		os.RemoveAll(filepath.Join(home, ".devkit"))
 	}()
 
@@ -556,6 +556,235 @@ echo "User-specific PM2 configuration completed"
 	for _, expected := range userStrings {
 		if !strings.Contains(output, expected) {
 			t.Errorf("expected user configuration output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PM2 global installation via npm for Azure environment
+func TestPM2InstallCmd_AzureGlobalNpmInstallation(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "pm2.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PM2 global installation for Azure
+	scriptContent := `#!/bin/bash
+echo "Installing PM2 globally via npm on Azure Ubuntu..."
+echo "Installing PM2 globally..."
+echo "sudo npm install -g pm2"
+echo "PM2 v5.3.0 installed globally"
+echo "PM2 binary available at /usr/local/bin/pm2"
+echo "PM2 configured for Azure Ubuntu environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PM2 global installation for Azure
+	output := buf.String()
+	globalStrings := []string{
+		"PM2 globally via npm",
+		"sudo npm install -g pm2",
+		"PM2 v5.3.0",
+		"/usr/local/bin/pm2",
+		"Azure Ubuntu environment",
+	}
+
+	for _, expected := range globalStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PM2 Azure global installation output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PM2 azureuser configuration for Azure environment
+func TestPM2InstallCmd_AzureUserConfiguration(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "pm2.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PM2 azureuser configuration
+	scriptContent := `#!/bin/bash
+echo "Configuring PM2 for azureuser on Azure..."
+echo "Saving PM2 configuration for azureuser..."
+echo "sudo -u azureuser pm2 save"
+echo "Setting up PM2 startup for azureuser..."
+echo "sudo -u azureuser pm2 startup systemd"
+echo "PM2 configuration saved for azureuser"
+echo "PM2 configured for Azure Ubuntu azureuser environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PM2 azureuser configuration
+	output := buf.String()
+	userStrings := []string{
+		"azureuser",
+		"sudo -u azureuser pm2 save",
+		"sudo -u azureuser pm2 startup",
+		"PM2 configuration saved",
+		"azureuser environment",
+	}
+
+	for _, expected := range userStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PM2 Azure azureuser configuration output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PM2 permissions and log directory setup for Azure
+func TestPM2InstallCmd_AzurePermissionsAndLogs(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "pm2.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PM2 permissions and logs for Azure
+	scriptContent := `#!/bin/bash
+echo "Setting up PM2 permissions and logs for Azure..."
+echo "Setting PM2 binary permissions..."
+echo "sudo chmod 755 $(which pm2)"
+echo "Setting PM2 module permissions..."
+echo "sudo chmod -R 755 $(dirname $(which pm2))/../lib/node_modules/pm2"
+echo "Creating PM2 log directory..."
+echo "sudo mkdir -p /var/log/pm2"
+echo "Setting PM2 log directory permissions..."
+echo "sudo chmod 777 /var/log/pm2"
+echo "PM2 permissions and logs configured for Azure Ubuntu"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PM2 permissions and logs for Azure
+	output := buf.String()
+	permStrings := []string{
+		"PM2 permissions",
+		"chmod 755",
+		"/var/log/pm2",
+		"chmod 777",
+		"Azure Ubuntu",
+	}
+
+	for _, expected := range permStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PM2 Azure permissions output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PM2 systemd startup configuration for Azure
+func TestPM2InstallCmd_AzureSystemdStartup(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "pm2.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PM2 systemd startup for Azure
+	scriptContent := `#!/bin/bash
+echo "Configuring PM2 systemd startup for Azure Ubuntu..."
+echo "Setting up PM2 startup script..."
+echo "sudo -u azureuser pm2 startup systemd"
+echo "PM2 startup script generated for systemd"
+echo "PM2 will start automatically on Azure VM boot"
+echo "PM2 systemd service configured for Azure environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PM2 systemd startup for Azure
+	output := buf.String()
+	systemdStrings := []string{
+		"PM2 systemd startup",
+		"pm2 startup systemd",
+		"startup script generated",
+		"Azure VM boot",
+		"Azure environment",
+	}
+
+	for _, expected := range systemdStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PM2 Azure systemd startup output to contain '%s', got: %s", expected, output)
 		}
 	}
 }

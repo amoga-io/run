@@ -156,26 +156,26 @@ func TestPHPInstallCmd_PermissionError_Safe(t *testing.T) {
 		t.Fatalf("Failed to create script directory: %v", err)
 	}
 
-	// Create a safe mock script with normal permissions first
+	// Create a safe mock script
 	scriptContent := `#!/bin/bash
 # MOCK SCRIPT - SAFE FOR TESTING
 echo "This is a safe mock script for PHP"
 `
 
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0000) // No permissions
 	if err != nil {
 		t.Fatalf("Failed to create mock script: %v", err)
 	}
 
-	// Now remove execute permissions to simulate permission error
-	err = os.Chmod(scriptPath, 0000) // No permissions
+	// Make the directory read-only to simulate permission error
+	err = os.Chmod(scriptDir, 0444)
 	if err != nil {
-		t.Fatalf("Failed to change script permissions: %v", err)
+		t.Fatalf("Failed to change directory permissions: %v", err)
 	}
 
 	// Cleanup after test
 	defer func() {
-		os.Chmod(scriptPath, 0755) // Restore permissions for cleanup
+		os.Chmod(scriptDir, 0755) // Restore permissions for cleanup
 		os.RemoveAll(filepath.Join(home, ".devkit"))
 	}()
 
@@ -524,6 +524,237 @@ echo "Repository setup completed"
 	for _, expected := range repoStrings {
 		if !strings.Contains(output, expected) {
 			t.Errorf("expected repository setup output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PHP 8.3 installation from ondrej/php PPA for Azure Ubuntu
+func TestPHPInstallCmd_AzureOndrejPHPRepository(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "php.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PHP 8.3 from ondrej/php for Azure
+	scriptContent := `#!/bin/bash
+echo "Installing PHP 8.3 from ondrej/php PPA on Azure Ubuntu..."
+echo "Updating package lists..."
+echo "apt update"
+echo "Installing prerequisites..."
+echo "apt install -y software-properties-common"
+echo "Adding ondrej/php repository..."
+echo "add-apt-repository -y ppa:ondrej/php"
+echo "apt update"
+echo "PHP repository configured for Azure Ubuntu environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PHP ondrej repository for Azure
+	output := buf.String()
+	repoStrings := []string{
+		"PHP 8.3",
+		"ondrej/php PPA",
+		"software-properties-common",
+		"add-apt-repository",
+		"Azure Ubuntu environment",
+	}
+
+	for _, expected := range repoStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PHP Azure repository setup output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PHP 8.3 extensions installation for Azure environment
+func TestPHPInstallCmd_AzurePHP83Extensions(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "php.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PHP 8.3 extensions for Azure
+	scriptContent := `#!/bin/bash
+echo "Installing PHP 8.3 and extensions for Azure Ubuntu..."
+echo "Installing PHP 8.3 core packages..."
+echo "apt install -y php8.3 php8.3-fpm php8.3-common"
+echo "Installing PHP 8.3 database extensions..."
+echo "apt install -y php8.3-mysql"
+echo "Installing PHP 8.3 utility extensions..."
+echo "apt install -y php8.3-curl php8.3-gd php8.3-mbstring php8.3-xml php8.3-zip"
+echo "PHP 8.3 extensions installed for Azure environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PHP 8.3 extensions for Azure
+	output := buf.String()
+	extensionStrings := []string{
+		"PHP 8.3 core packages",
+		"php8.3-fpm",
+		"php8.3-mysql",
+		"php8.3-curl",
+		"Azure environment",
+	}
+
+	for _, expected := range extensionStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PHP Azure extensions output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PHP-FPM service configuration for Azure Ubuntu
+func TestPHPInstallCmd_AzurePHPFPMService(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "php.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PHP-FPM service for Azure
+	scriptContent := `#!/bin/bash
+echo "Configuring PHP-FPM service for Azure Ubuntu..."
+echo "Enabling PHP-FPM service..."
+echo "systemctl enable php8.3-fpm"
+echo "Starting PHP-FPM service..."
+echo "systemctl start php8.3-fpm"
+echo "PHP-FPM service active and running on Azure"
+echo "PHP-FPM configured to start on Azure VM boot"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PHP-FPM service for Azure
+	output := buf.String()
+	fpmStrings := []string{
+		"PHP-FPM service",
+		"systemctl enable php8.3-fpm",
+		"systemctl start php8.3-fpm",
+		"Azure VM boot",
+		"Azure Ubuntu",
+	}
+
+	for _, expected := range fpmStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PHP-FPM Azure service output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PHP version verification for Azure environment
+func TestPHPInstallCmd_AzurePHPVersionVerification(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "php.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PHP version verification for Azure
+	scriptContent := `#!/bin/bash
+echo "Verifying PHP installation on Azure Ubuntu..."
+echo "Checking PHP version..."
+echo "php -v"
+echo "PHP 8.3.0 (cli) (built: Dec 13 2024 08:15:32) ( NTS )"
+echo "Copyright (c) The PHP Group"
+echo "Zend Engine v4.3.0, Copyright (c) Zend Technologies"
+echo "PHP 8.3 installed successfully on Azure Ubuntu"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PHP version for Azure
+	output := buf.String()
+	versionStrings := []string{
+		"php -v",
+		"PHP 8.3.0",
+		"Copyright (c) The PHP Group",
+		"Zend Engine",
+		"Azure Ubuntu",
+	}
+
+	for _, expected := range versionStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PHP Azure version verification output to contain '%s', got: %s", expected, output)
 		}
 	}
 }

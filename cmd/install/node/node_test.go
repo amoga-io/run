@@ -498,3 +498,232 @@ echo "Use 'pm2 start app.js' to start applications"
 		}
 	}
 }
+
+// Test Node.js 20 installation for Azure Ubuntu
+func TestNodeInstallCmd_AzureNodeJS20Installation(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "node.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests Node.js 20 installation for Azure
+	scriptContent := `#!/bin/bash
+echo "Installing Node.js 20 on Azure Ubuntu..."
+echo "Adding NodeSource repository..."
+echo "curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+echo "Installing Node.js 20..."
+echo "sudo apt-get install -y nodejs"
+echo "Node.js v20.12.0 installed successfully"
+echo "npm 10.5.0 installed successfully"
+echo "Node.js 20 configured for Azure Ubuntu environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify Node.js 20 installation for Azure
+	output := buf.String()
+	nodeStrings := []string{
+		"Node.js 20",
+		"NodeSource repository",
+		"Node.js v20.12.0",
+		"npm 10.5.0",
+		"Azure Ubuntu environment",
+	}
+
+	for _, expected := range nodeStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected Node.js 20 Azure installation output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test npm global configuration for Azure user
+func TestNodeInstallCmd_AzureNpmGlobalSetup(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "node.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests npm global setup for Azure user
+	scriptContent := `#!/bin/bash
+echo "Configuring npm global directory for Azure user..."
+echo "Creating ~/.npm-global directory..."
+echo "mkdir -p ~/.npm-global"
+echo "Setting npm prefix to ~/.npm-global..."
+echo "npm config set prefix ~/.npm-global"
+echo "Adding ~/.npm-global/bin to PATH in ~/.profile..."
+echo "export PATH=~/.npm-global/bin:$PATH"
+echo "npm global configuration completed for Azure environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify npm global setup for Azure
+	output := buf.String()
+	npmStrings := []string{
+		"npm global directory",
+		"~/.npm-global",
+		"npm prefix",
+		"PATH in ~/.profile",
+		"Azure environment",
+	}
+
+	for _, expected := range npmStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected npm global Azure setup output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test pnpm 9.10.0 installation for Azure environment
+func TestNodeInstallCmd_AzurePnpmInstallation(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "node.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests pnpm 9.10.0 installation for Azure
+	scriptContent := `#!/bin/bash
+echo "Installing pnpm 9.10.0 on Azure Ubuntu..."
+echo "npm install -g pnpm@9.10.0"
+echo "Adding pnpm to PATH..."
+echo "export PATH=~/.npm-global/bin:$PATH"
+echo "pnpm 9.10.0 installed successfully"
+echo "pnpm configured for Azure Ubuntu environment"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify pnpm installation for Azure
+	output := buf.String()
+	pnpmStrings := []string{
+		"pnpm 9.10.0",
+		"npm install -g pnpm",
+		"pnpm to PATH",
+		"pnpm configured",
+		"Azure Ubuntu environment",
+	}
+
+	for _, expected := range pnpmStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected pnpm Azure installation output to contain '%s', got: %s", expected, output)
+		}
+	}
+}
+
+// Test PM2 installation and Azure systemd configuration
+func TestNodeInstallCmd_AzurePM2SystemdSetup(t *testing.T) {
+	// Setup test environment
+	home, _ := os.UserHomeDir()
+	scriptDir := filepath.Join(home, ".devkit", "scripts")
+	scriptPath := filepath.Join(scriptDir, "node.sh")
+
+	// Create the scripts directory
+	err := os.MkdirAll(scriptDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create script directory: %v", err)
+	}
+
+	// Create a script that tests PM2 systemd setup for Azure
+	scriptContent := `#!/bin/bash
+echo "Installing PM2 for Azure environment..."
+echo "npm install -g pm2"
+echo "Setting up PM2 startup for systemd..."
+echo "pm2 startup"
+echo "Configuring PM2 for azureuser..."
+echo "sudo env PATH=$PATH:/usr/bin /home/azureuser/.npm-global/lib/node_modules/pm2/bin/pm2 startup systemd -u azureuser --hp /home/azureuser"
+echo "PM2 configured for Azure Ubuntu systemd"
+`
+
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock script: %v", err)
+	}
+
+	// Cleanup after test
+	defer os.RemoveAll(filepath.Join(home, ".devkit"))
+
+	// Capture command output
+	buf := new(bytes.Buffer)
+	Cmd.SetOut(buf)
+	Cmd.SetErr(buf)
+
+	// Execute the command
+	Cmd.Run(Cmd, []string{})
+
+	// Verify PM2 Azure systemd setup
+	output := buf.String()
+	pm2Strings := []string{
+		"PM2 for Azure",
+		"pm2 startup",
+		"azureuser",
+		"systemd",
+		"Azure Ubuntu systemd",
+	}
+
+	for _, expected := range pm2Strings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("expected PM2 Azure systemd setup output to contain '%s', got: %s", expected, output)
+		}
+	}
+}

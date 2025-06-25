@@ -19,6 +19,7 @@ var Cmd = &cobra.Command{
 		scriptPath := utils.GetScriptPath("docker.sh")
 		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Docker installation script not found at %s\n", scriptPath)
+			return
 		}
 
 		if err := os.Chmod(scriptPath, 0755); err != nil {

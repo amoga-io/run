@@ -156,26 +156,26 @@ func TestPHPInstallCmd_PermissionError_Safe(t *testing.T) {
 		t.Fatalf("Failed to create script directory: %v", err)
 	}
 
-	// Create a safe mock script
+	// Create a safe mock script with normal permissions first
 	scriptContent := `#!/bin/bash
 # MOCK SCRIPT - SAFE FOR TESTING
 echo "This is a safe mock script for PHP"
 `
 
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0000) // No permissions
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
 	if err != nil {
 		t.Fatalf("Failed to create mock script: %v", err)
 	}
 
-	// Make the directory read-only to simulate permission error
-	err = os.Chmod(scriptDir, 0444)
+	// Now remove execute permissions to simulate permission error
+	err = os.Chmod(scriptPath, 0000) // No permissions
 	if err != nil {
-		t.Fatalf("Failed to change directory permissions: %v", err)
+		t.Fatalf("Failed to change script permissions: %v", err)
 	}
 
 	// Cleanup after test
 	defer func() {
-		os.Chmod(scriptDir, 0755) // Restore permissions for cleanup
+		os.Chmod(scriptPath, 0755) // Restore permissions for cleanup
 		os.RemoveAll(filepath.Join(home, ".devkit"))
 	}()
 

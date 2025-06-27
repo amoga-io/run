@@ -14,6 +14,9 @@ curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/scripts/install.s
 # Show help
 run --help
 
+# Show version information
+run version
+
 # Update to latest version
 run update
 ```
@@ -59,15 +62,35 @@ rm -rf ~/.run
 
 ## Enterprise Notes
 
-This tool is designed for internal enterprise use. The installation process:
+This tool is designed for internal enterprise use with Git-based versioning:
+
+1. **Versioning**: Uses Git tags for semantic versioning (v1.0.0, v1.2.3, etc.)
+2. **Releases**: GitHub Actions automatically creates releases when tags are pushed
+3. **Installation**: Always builds from source with proper version embedding
+4. **Updates**: Self-updating mechanism maintains version consistency
+
+The installation process:
 
 1. Verifies system compatibility (Ubuntu/Debian)
 2. Checks and installs required dependencies
 3. Clones repository to `~/.run/` for persistent updates
-4. Builds and installs binary to `/usr/local/bin/`
-5. Uses atomic file operations to prevent corruption
+4. Builds with version information embedded from Git
+5. Installs binary to `/usr/local/bin/` using atomic operations
 
-The update mechanism ensures the CLI stays current with the enterprise repository while maintaining system stability.
+## Versioning
+
+The CLI uses Git-based versioning:
+
+```bash
+# Create and push a new version
+git tag v1.0.0
+git push origin v1.0.0
+
+# This triggers GitHub Actions to create a release
+# Next installation will show the new version
+```
+
+Default version is `v0.0.0` when no tags exist.
 
 ## License
 

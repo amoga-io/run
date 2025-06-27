@@ -11,10 +11,9 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:     "run",
-	Short:   "A Git-based CLI for Ubuntu systems",
-	Long:    "A simple Git-based CLI tool that can update itself from GitHub repository.",
-	Version: "1.0.0",
+	Use:   "run",
+	Short: "A Git-based CLI for Ubuntu systems",
+	Long:  "A simple Git-based CLI tool that can update itself from GitHub repository.",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

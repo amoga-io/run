@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/amoga-io/run/internal/system"
 	"github.com/spf13/cobra"
@@ -78,7 +80,31 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Build new binary
 	fmt.Println("Building new binary...")
 	binaryName := "run"
-	buildCmd := exec.Command("go", "build", "-o", binaryName, ".")
+
+	// Get version information for build
+	versionCmd := exec.Command("git", "describe", "--tags", "--always")
+	versionOutput, err := versionCmd.Output()
+	version := "v0.0.0-dev"
+	if err == nil {
+		version = strings.TrimSpace(string(versionOutput))
+	}
+
+	commitCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	commitOutput, err := commitCmd.Output()
+	commit := "unknown"
+	if err == nil {
+		commit = strings.TrimSpace(string(commitOutput))
+	}
+
+	buildDate := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+
+	fmt.Printf("Building version: %s\n", version)
+
+	// Build with version information embedded
+	buildCmd := exec.Command("go", "build",
+		"-ldflags", fmt.Sprintf(`-X 'github.com/amoga-io/run/cmd.Version=%s' -X 'github.com/amoga-io/run/cmd.GitCommit=%s' -X 'github.com/amoga-io/run/cmd.BuildDate=%s'`,
+			version, commit, buildDate),
+		"-o", binaryName, ".")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 

@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0, v1.2.3, etc.
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for proper git describe
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Get version info
+      id: version
+      run: |
+        # Extract version from tag
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        # Get commit hash
+        COMMIT=$(git rev-parse --short HEAD)
+        echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+        
+        # Get build date
+        BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+        
+        echo "Building version: $VERSION"
+    
+    - name: Run tests
+      run: |
+        go mod tidy
+        go test ./... -v
+    
+    - name: Build binary
+      run: |
+        go mod tidy
+        go build -ldflags "\
+          -X 'github.com/amoga-io/run/cmd.Version=${{ steps.version.outputs.version }}' \
+          -X 'github.com/amoga-io/run/cmd.GitCommit=${{ steps.version.outputs.commit }}' \
+          -X 'github.com/amoga-io/run/cmd.BuildDate=${{ steps.version.outputs.build_date }}'" \
+          -o run .
+    
+    - name: Test built binary
+      run: |
+        ./run version
+        ./run --help
+    
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get previous tag for changelog generation
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -n "$PREV_TAG" ]; then
+          echo "## Changes since $PREV_TAG" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> CHANGELOG.md
+        else
+          echo "## Initial Release" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "- Initial release of the run CLI" >> CHANGELOG.md
+        fi
+        
+        # Set output for release notes
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat CHANGELOG.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        release_name: Release ${{ steps.version.outputs.version }}
+        body: |
+          # Run CLI ${{ steps.version.outputs.version }}
+          
+          A simple Git-based CLI tool for Ubuntu systems with self-install and update capabilities.
+          
+          ## Installation
+          
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/scripts/install.sh | bash
+          ```
+          
+          ## What's New
+          
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ## Build Information
+          - **Version**: ${{ steps.version.outputs.version }}
+          - **Git Commit**: ${{ steps.version.outputs.commit }}
+          - **Build Date**: ${{ steps.version.outputs.build_date }}
+          - **Go Version**: 1.21
+          
+          ## Files
+          The CLI installs itself from source, no binary downloads needed.
+          
+        draft: false
+        prerelease: false

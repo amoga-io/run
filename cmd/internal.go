@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/amoga-io/run/internal/system"
 	"github.com/spf13/cobra"
 )
@@ -28,13 +29,13 @@ var internalDepCheckCmd = &cobra.Command{
 
 func runInternalVerify(cmd *cobra.Command, args []string) error {
 	fmt.Println("Verifying installation...")
-	
+
 	// Check if all critical dependencies are available
 	missing, err := system.CheckSystemRequirements(system.Bootstrap, system.Runtime)
 	if err != nil {
 		return err
 	}
-	
+
 	if len(missing) > 0 {
 		fmt.Printf("Warning: Some dependencies are missing but installation succeeded\n")
 		for _, req := range missing {
@@ -46,7 +47,7 @@ func runInternalVerify(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println("These will be installed automatically when needed.")
 	}
-	
+
 	fmt.Println("✓ Installation verified successfully")
 	return nil
 }

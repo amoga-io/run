@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/amoga-io/run/internal/system"
 	"github.com/spf13/cobra"
 )
@@ -69,12 +70,12 @@ func checkDependencies() error {
 	if err != nil {
 		return err
 	}
-	
+
 	if len(missing) == 0 {
 		fmt.Println("✓ All legacy dependencies are available")
 		return nil
 	}
-	
+
 	fmt.Printf("❌ Missing %d legacy dependencies:\n", len(missing))
 	for _, dep := range missing {
 		fmt.Printf("  - %s: %s (install: %s)\n", dep.Command, dep.Description, dep.Package)
@@ -84,22 +85,22 @@ func checkDependencies() error {
 
 func checkAll() error {
 	fmt.Println("Checking all system requirements...")
-	
+
 	categories := []system.RequirementCategory{
 		system.Bootstrap,
 		system.Runtime,
 		system.Development,
 		system.Optional,
 	}
-	
+
 	allGood := true
-	
+
 	for _, category := range categories {
 		missing, err := system.CheckSystemRequirements(category)
 		if err != nil {
 			return err
 		}
-		
+
 		if len(missing) > 0 {
 			allGood = false
 			fmt.Printf("\n%s requirements:\n", string(category))
@@ -112,14 +113,14 @@ func checkAll() error {
 			}
 		}
 	}
-	
+
 	if allGood {
 		fmt.Println("✓ All system requirements are satisfied")
 	} else {
 		fmt.Println("\n❌ = Critical missing")
 		fmt.Println("⚠️ = Optional missing")
 	}
-	
+
 	return nil
 }
 
@@ -128,7 +129,7 @@ func reportMissing(category string, missing []system.SystemRequirement) error {
 		fmt.Printf("✓ All %s requirements are available\n", category)
 		return nil
 	}
-	
+
 	fmt.Printf("❌ Missing %d %s requirements:\n", len(missing), category)
 	for _, req := range missing {
 		status := "required"

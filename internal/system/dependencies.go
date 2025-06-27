@@ -9,20 +9,20 @@ import (
 type RequirementCategory string
 
 const (
-	Bootstrap    RequirementCategory = "bootstrap"    // Needed to build CLI
-	Runtime      RequirementCategory = "runtime"      // Needed for CLI to work
-	Development  RequirementCategory = "development"  // Nice to have for dev work
-	Optional     RequirementCategory = "optional"     // Provided by essentials
+	Bootstrap   RequirementCategory = "bootstrap"   // Needed to build CLI
+	Runtime     RequirementCategory = "runtime"     // Needed for CLI to work
+	Development RequirementCategory = "development" // Nice to have for dev work
+	Optional    RequirementCategory = "optional"    // Provided by essentials
 )
 
 // SystemRequirement represents what's needed for the CLI to function
 type SystemRequirement struct {
 	Name        string              `json:"name"`
-	Commands    []string            `json:"commands"`    // Commands that must exist
-	Packages    []string            `json:"packages"`    // Packages to install if missing
+	Commands    []string            `json:"commands"` // Commands that must exist
+	Packages    []string            `json:"packages"` // Packages to install if missing
 	Description string              `json:"description"`
 	Category    RequirementCategory `json:"category"`
-	Critical    bool                `json:"critical"`    // Must have for CLI to work
+	Critical    bool                `json:"critical"` // Must have for CLI to work
 }
 
 // Dependency represents a system dependency (legacy compatibility)

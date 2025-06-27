@@ -1,7 +1,23 @@
 #!/bin/bash
 
+DEFAULT_VERSION=mainline
+version="$DEFAULT_VERSION"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version)
+      shift
+      version="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
 # Add Nginx official repository
-echo "deb [arch=amd64] http://nginx.org/packages/mainline/ubuntu/ $(lsb_release -cs) nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
+echo "deb [arch=amd64] http://nginx.org/packages/$version/ubuntu/ $(lsb_release -cs) nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
 
 # Add Nginx signing key
 curl -fsSL https://nginx.org/keys/nginx_signing.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/nginx.gpg

@@ -4,6 +4,22 @@
 # Exit on error
 set -e
 
+DEFAULT_VERSION=8.3
+version="$DEFAULT_VERSION"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version)
+      shift
+      version="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
 # Update package lists
 apt update
 
@@ -15,14 +31,14 @@ add-apt-repository -y ppa:ondrej/php
 apt update
 
 # Install PHP 8.3 (latest stable as of April 2025)
-apt install -y php8.3 php8.3-fpm php8.3-common php8.3-mysql php8.3-curl php8.3-gd \
-  php8.3-mbstring php8.3-xml php8.3-zip
+apt install -y php"$version" php"$version"-fpm php"$version"-common php"$version"-mysql php"$version"-curl php"$version"-gd \
+  php"$version"-mbstring php"$version"-xml php"$version"-zip
 
 # Enable and start PHP-FPM
-systemctl enable php8.3-fpm
-systemctl start php8.3-fpm
+systemctl enable php"$version"-fpm
+systemctl start php"$version"-fpm
 
 # Show installed PHP version
 php -v
 
-echo "PHP 8.3 installed successfully"
+echo "PHP $version installed successfully"

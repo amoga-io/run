@@ -1,5 +1,22 @@
 #!/bin/bash
 
+DEFAULT_VERSION=3.10
+version="$DEFAULT_VERSION"
+
+# Parse --version flag
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version)
+      shift
+      version="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
 # Script to install Python, pip, gunicorn and venv on azureuser
 # Exit immediately if a command exits with a non-zero status
 set -e
@@ -14,7 +31,7 @@ fi
 apt-get update
 
 # Install Python and development tools
-apt-get install -y python3 python3-pip python3-dev python3-venv python3-full
+apt-get install -y python"$version" python"$version"-pip python"$version"-dev python"$version"-venv python"$version"-full
 
 # Install gunicorn via apt instead of pip
 apt-get install -y gunicorn

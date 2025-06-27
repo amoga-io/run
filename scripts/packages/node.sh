@@ -1,7 +1,24 @@
 #!/bin/bash
 
-# Install Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+DEFAULT_VERSION=20
+version="$DEFAULT_VERSION"
+
+# Parse --version flag
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version)
+      shift
+      version="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+# Install Node.js with the specified or default version
+curl -fsSL https://deb.nodesource.com/setup_"$version".x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Detect the user to set up PM2 and npm global directory

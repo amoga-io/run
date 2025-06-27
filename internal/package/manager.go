@@ -302,17 +302,43 @@ func (m *Manager) RemovePackage(packageName string) error {
 // Individual removal functions (Go-based complete cleanup)
 func (m *Manager) removePython() error {
 	fmt.Println("Stopping Python services...")
-	commands := [][]string{
-		{"sudo", "pkill", "-f", "python3", "||", "true"},
-		{"sudo", "apt-get", "purge", "-y", "-qq", "python3*", "python3-*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/python3*"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/python*"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/pip*"},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".cache/pip")},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".local/lib/python*")},
-		{"sudo", "apt-get", "autoremove", "-y", "-qq"},
+
+	// Get system default python version
+	systemVersion := ""
+	if out, err := exec.Command("python3", "--version").Output(); err == nil {
+		parts := strings.Fields(string(out))
+		if len(parts) >= 2 {
+			ver := parts[1]
+			verParts := strings.Split(ver, ".")
+			if len(verParts) >= 2 {
+				systemVersion = verParts[0] + "." + verParts[1]
+			}
+		}
 	}
-	return m.executeRemovalCommands("Python", commands)
+
+	// Only allow removal of user-installed versions (e.g., python3.10, python3.11)
+	userVersions := []string{"3.10", "3.11"} // Add more as needed
+	removedAny := false
+	for _, v := range userVersions {
+		if v == systemVersion {
+			fmt.Printf("Refusing to remove system Python (%s). This would break your OS.\n", v)
+			continue
+		}
+		fmt.Printf("Attempting to remove Python %s...\n", v)
+		commands := [][]string{
+			{"sudo", "apt-get", "purge", "-y", "python" + v, "python" + v + "-venv", "python" + v + "-dev"},
+			{"sudo", "apt-get", "autoremove", "-y"},
+			{"sudo", "rm", "-rf", "/usr/local/lib/python" + v + "*"},
+			{"sudo", "rm", "-rf", "/usr/local/bin/python" + v + "*"},
+			{"sudo", "rm", "-rf", "/usr/local/bin/pip" + v + "*"},
+		}
+		m.executeRemovalCommands("Python "+v, commands)
+		removedAny = true
+	}
+	if !removedAny {
+		fmt.Println("No user-installed Python versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removeNode() error {

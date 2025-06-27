@@ -4,6 +4,7 @@ if [ "$SUDO_USER" ]; then
 else
   TARGET_USER="$(whoami)"
 fi
+TARGET_HOME="$(eval echo "~$TARGET_USER")"
 
 DEFAULT_VERSION="latest"
 version="$DEFAULT_VERSION"
@@ -21,15 +22,23 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+export PATH="$TARGET_HOME/.npm-global/bin:$PATH"
+
 if [ "$version" = "latest" ]; then
   sudo -u "$TARGET_USER" npm install -g pm2
 else
   sudo -u "$TARGET_USER" npm install -g pm2@"$version"
 fi
 
-sudo -u "$TARGET_USER" pm2 save
-sudo chmod 755 $(which pm2)
-sudo chmod -R 755 $(dirname $(which pm2))/../lib/node_modules/pm2
+# Source the user's profile to update PATH and check pm2
+if ! sudo -u "$TARGET_USER" bash -c "source $TARGET_HOME/.profile && which pm2" > /dev/null; then
+  echo "pm2 not found in PATH for $TARGET_USER after install"
+  exit 1
+fi
+
+sudo -u "$TARGET_USER" bash -c "source $TARGET_HOME/.profile && pm2 save"
+sudo chmod 755 "$(sudo -u "$TARGET_USER" bash -c 'source $TARGET_HOME/.profile && which pm2')"
+sudo chmod -R 755 "$(dirname "$(sudo -u "$TARGET_USER" bash -c 'source $TARGET_HOME/.profile && which pm2')")/../lib/node_modules/pm2"
 sudo mkdir -p /var/log/pm2
 sudo chmod 777 /var/log/pm2
-sudo -u "$TARGET_USER" pm2 startup systemd
+sudo -u "$TARGET_USER" bash -c "source $TARGET_HOME/.profile && pm2 startup systemd"

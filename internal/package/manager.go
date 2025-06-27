@@ -51,6 +51,35 @@ func (m *Manager) InstallPackage(packageName string) error {
 	return m.executeInstallScript(pkg)
 }
 
+// InstallPackageWithArgs installs a package and passes extra arguments to the install script
+func (m *Manager) InstallPackageWithArgs(packageName string, extraArgs []string) error {
+	pkg, exists := GetPackage(packageName)
+	if !exists {
+		return fmt.Errorf("package '%s' not found", packageName)
+	}
+
+	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
+
+	// Smart suggestions before installation
+	m.provideSuggestions(pkg)
+
+	// Step 1: Check and install dependencies
+	if err := m.installDependencies(pkg); err != nil {
+		return fmt.Errorf("failed to install dependencies: %w", err)
+	}
+
+	// Step 2: Check if package is already installed, remove if so
+	if m.isPackageInstalled(pkg) {
+		fmt.Printf("Package %s is already installed, removing first...\n", pkg.Name)
+		if err := m.RemovePackage(packageName); err != nil {
+			return fmt.Errorf("failed to remove existing package: %w", err)
+		}
+	}
+
+	// Step 3: Execute installation script with extra arguments
+	return m.executeInstallScriptWithArgs(pkg, extraArgs)
+}
+
 // provideSuggestions provides smart suggestions based on package being installed
 func (m *Manager) provideSuggestions(pkg Package) {
 	essentialsPkg, essentialsExists := GetPackage("essentials")
@@ -170,6 +199,44 @@ func (m *Manager) executeInstallScript(pkg Package) error {
 
 	// Set environment for silent installation
 	cmd := exec.Command("sudo", "bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"DEBIAN_FRONTEND=noninteractive",
+		"NEEDRESTART_MODE=a", // Automatic restart services
+	)
+
+	// Run silently but capture errors
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("installation script failed: %w\nOutput: %s", err, string(output))
+	}
+
+	// Verify installation
+	if !m.isPackageInstalled(pkg) {
+		return fmt.Errorf("package installation verification failed - commands not available: %s", strings.Join(pkg.Commands, ", "))
+	}
+
+	fmt.Printf("✓ Successfully installed %s\n", pkg.Name)
+	return nil
+}
+
+// executeInstallScriptWithArgs runs the package installation script with extra arguments
+func (m *Manager) executeInstallScriptWithArgs(pkg Package, extraArgs []string) error {
+	scriptPath := filepath.Join(m.repoPath, pkg.ScriptPath)
+
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		return fmt.Errorf("installation script not found: %s", scriptPath)
+	}
+
+	fmt.Printf("Executing installation script for %s...\n", pkg.Name)
+
+	// Make script executable
+	if err := os.Chmod(scriptPath, 0755); err != nil {
+		return fmt.Errorf("failed to make script executable: %w", err)
+	}
+
+	// Set environment for silent installation
+	cmdArgs := append([]string{"bash", scriptPath}, extraArgs...)
+	cmd := exec.Command("sudo", cmdArgs...)
 	cmd.Env = append(os.Environ(),
 		"DEBIAN_FRONTEND=noninteractive",
 		"NEEDRESTART_MODE=a", // Automatic restart services

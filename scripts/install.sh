@@ -64,19 +64,19 @@ wait_for_apt() {
     done
 }
 
-# Step 2: Check and install required dependencies (SILENT)
-install_dependencies() {
-    echo "Checking required dependencies..."
+# Step 2: Bootstrap minimal dependencies for CLI build (SILENT)
+bootstrap_dependencies() {
+    echo "Bootstrapping minimal dependencies..."
 
-    local missing_deps=()
+    local bootstrap_deps=()
 
-    # Check required dependencies for building the CLI
+    # Only install what's absolutely needed to build CLI
     if ! command_exists git; then
-        missing_deps+=("git")
+        bootstrap_deps+=("git")
     fi
 
     if ! command_exists go; then
-        missing_deps+=("golang-go")
+        bootstrap_deps+=("golang-go")
     fi
 
     if ! command_exists sudo; then
@@ -84,9 +84,9 @@ install_dependencies() {
         exit 1
     fi
 
-    # Install missing dependencies SILENTLY
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        echo "Installing missing dependencies: ${missing_deps[*]}"
+    # Install bootstrap dependencies SILENTLY
+    if [ ${#bootstrap_deps[@]} -gt 0 ]; then
+        echo "Installing bootstrap dependencies: ${bootstrap_deps[*]}"
         
         # Wait for any existing apt processes to finish
         wait_for_apt
@@ -97,7 +97,13 @@ install_dependencies() {
         
         # Install dependencies silently without user interaction
         echo "Installing packages..."
-        sudo apt-get install -y -qq --no-install-recommends "${missing_deps[@]}" >/dev/null 2>&1
+        sudo apt-get install -y -qq --no-install-recommends "${bootstrap_deps[@]}" >/dev/null 2>&1
+        
+        echo "✓ Bootstrap dependencies installed successfully"
+    else
+        echo "✓ Bootstrap dependencies already available"
+    fi
+}
         
         echo "✓ Dependencies installed successfully"
     else
@@ -111,15 +117,15 @@ if ! grep -q -i "ubuntu\|debian" /etc/os-release 2>/dev/null; then
 fi
 
 # Step 2: Install dependencies
-install_dependencies
+bootstrap_dependencies
 
-# Step 3: Install the CLI
+# Step 3: Clone and build CLI
 echo "Cloning repository..."
 git clone "$REPO_URL" "$PERSISTENT_DIR" >/dev/null 2>&1
 cd "$PERSISTENT_DIR"
 
 # Build binary
-echo "Building binary..."
+echo "Building CLI..."
 go mod tidy >/dev/null 2>&1
 
 # Get version information for build
@@ -142,7 +148,7 @@ if [ ! -f "$BINARY_NAME" ]; then
     exit 1
 fi
 
-# Install binary
+# Step 4: Install binary and let CLI handle advanced dependency management
 echo "Installing binary to $INSTALL_DIR..."
 sudo mkdir -p "$INSTALL_DIR"
 
@@ -152,6 +158,13 @@ TEMP_BINARY="$INSTALL_DIR/${BINARY_NAME}.new"
 sudo cp "$BINARY_NAME" "$TEMP_BINARY"
 sudo chmod +x "$TEMP_BINARY"
 sudo mv "$TEMP_BINARY" "$BINARY_PATH"
+
+# Step 5: Let CLI verify its own installation
+echo "Finalizing installation..."
+"$BINARY_PATH" internal verify-installation || {
+    echo "✗ Installation verification failed"
+    exit 1
+}
 
 # Verify installation (silent check)
 if command_exists "$BINARY_NAME"; then

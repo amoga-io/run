@@ -1,5 +1,6 @@
 package cmd
 
+
 import (
 	"fmt"
 	"os"
@@ -22,8 +23,8 @@ var updateCmd = &cobra.Command{
 func runUpdate(cmd *cobra.Command, args []string) error {
 	fmt.Println("Updating run CLI...")
 
-	// Check and install required dependencies
-	if err := system.EnsureDependencies(); err != nil {
+	// Check and install required dependencies for CLI operation
+	if err := system.EnsureRuntimeRequirements(); err != nil {
 		return fmt.Errorf("dependency check failed: %w", err)
 	}
 

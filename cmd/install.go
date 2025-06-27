@@ -47,6 +47,14 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// toTitle converts first character to uppercase (replacement for deprecated strings.Title)
+func toTitle(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
 func listPackages() error {
 	packages := pkg.ListPackages()
 
@@ -59,7 +67,7 @@ func listPackages() error {
 	}
 
 	for category, pkgs := range categories {
-		fmt.Printf("%s:\n", strings.Title(category))
+		fmt.Printf("%s:\n", toTitle(category))
 		for _, p := range pkgs {
 			deps := ""
 			if len(p.Dependencies) > 0 {

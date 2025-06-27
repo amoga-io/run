@@ -5,7 +5,27 @@ import (
 	"os/exec"
 )
 
-// Dependency represents a system dependency
+// RequirementCategory defines different types of system requirements
+type RequirementCategory string
+
+const (
+	Bootstrap    RequirementCategory = "bootstrap"    // Needed to build CLI
+	Runtime      RequirementCategory = "runtime"      // Needed for CLI to work
+	Development  RequirementCategory = "development"  // Nice to have for dev work
+	Optional     RequirementCategory = "optional"     // Provided by essentials
+)
+
+// SystemRequirement represents what's needed for the CLI to function
+type SystemRequirement struct {
+	Name        string              `json:"name"`
+	Commands    []string            `json:"commands"`    // Commands that must exist
+	Packages    []string            `json:"packages"`    // Packages to install if missing
+	Description string              `json:"description"`
+	Category    RequirementCategory `json:"category"`
+	Critical    bool                `json:"critical"`    // Must have for CLI to work
+}
+
+// Dependency represents a system dependency (legacy compatibility)
 type Dependency struct {
 	Command     string
 	Package     string
@@ -146,28 +166,161 @@ func InstallDependencies(missing []Dependency) error {
 	return nil
 }
 
-// EnsureDependencies checks and installs all required dependencies
+// EnsureDependencies checks and installs all required dependencies (legacy compatibility)
+// Deprecated: Use EnsureRuntimeRequirements instead
 func EnsureDependencies() error {
-	fmt.Println("Checking dependencies...")
+	return EnsureRuntimeRequirements()
+}
 
-	missing, err := CheckAllDependencies()
+// GetSystemRequirements returns all system requirements categorized
+func GetSystemRequirements() []SystemRequirement {
+	return []SystemRequirement{
+		// Bootstrap requirements - absolutely needed to build CLI
+		{
+			Name:        "git",
+			Commands:    []string{"git"},
+			Packages:    []string{"git"},
+			Description: "Git version control system",
+			Category:    Bootstrap,
+			Critical:    true,
+		},
+		{
+			Name:        "golang",
+			Commands:    []string{"go"},
+			Packages:    []string{"golang-go"},
+			Description: "Go programming language",
+			Category:    Bootstrap,
+			Critical:    true,
+		},
+		// Runtime requirements - needed for CLI to work properly
+		{
+			Name:        "sudo",
+			Commands:    []string{"sudo"},
+			Packages:    []string{"sudo"},
+			Description: "Administrative privileges",
+			Category:    Runtime,
+			Critical:    true,
+		},
+		{
+			Name:        "curl",
+			Commands:    []string{"curl"},
+			Packages:    []string{"curl"},
+			Description: "HTTP client for downloads",
+			Category:    Runtime,
+			Critical:    false,
+		},
+		// Development requirements - nice to have for development
+		{
+			Name:        "build-tools",
+			Commands:    []string{"gcc", "make"},
+			Packages:    []string{"build-essential"},
+			Description: "Essential build tools",
+			Category:    Development,
+			Critical:    false,
+		},
+		// Optional requirements - provided by essentials
+		{
+			Name:        "utilities",
+			Commands:    []string{"jq", "ncdu"},
+			Packages:    []string{"jq", "ncdu"},
+			Description: "Development utilities",
+			Category:    Optional,
+			Critical:    false,
+		},
+	}
+}
+
+// GetRequirementsByCategory returns requirements filtered by category
+func GetRequirementsByCategory(category RequirementCategory) []SystemRequirement {
+	var filtered []SystemRequirement
+	for _, req := range GetSystemRequirements() {
+		if req.Category == category {
+			filtered = append(filtered, req)
+		}
+	}
+	return filtered
+}
+
+// CheckSystemRequirements checks what's missing based on category filter
+func CheckSystemRequirements(categories ...RequirementCategory) ([]SystemRequirement, error) {
+	var missing []SystemRequirement
+
+	requirements := GetSystemRequirements()
+	if len(categories) > 0 {
+		// Filter by categories
+		var filtered []SystemRequirement
+		for _, req := range requirements {
+			for _, cat := range categories {
+				if req.Category == cat {
+					filtered = append(filtered, req)
+					break
+				}
+			}
+		}
+		requirements = filtered
+	}
+
+	for _, req := range requirements {
+		allPresent := true
+		for _, cmd := range req.Commands {
+			if !CommandExists(cmd) {
+				allPresent = false
+				break
+			}
+		}
+
+		if !allPresent {
+			missing = append(missing, req)
+		}
+	}
+
+	return missing, nil
+}
+
+// EnsureBootstrapRequirements ensures only bootstrap dependencies (git, go)
+func EnsureBootstrapRequirements() error {
+	missing, err := CheckSystemRequirements(Bootstrap)
 	if err != nil {
-		return fmt.Errorf("failed to check dependencies: %w", err)
+		return err
 	}
 
 	if len(missing) == 0 {
-		fmt.Println("All dependencies are available.")
+		fmt.Println("✓ Bootstrap dependencies available")
 		return nil
 	}
 
-	fmt.Printf("Missing dependencies: ")
-	for i, dep := range missing {
-		if i > 0 {
-			fmt.Print(", ")
-		}
-		fmt.Print(dep.Command)
+	fmt.Printf("Installing bootstrap dependencies...\n")
+	var packages []string
+	for _, req := range missing {
+		fmt.Printf("  - %s: %s\n", req.Name, req.Description)
+		packages = append(packages, req.Packages...)
 	}
-	fmt.Println()
 
-	return InstallDependencies(missing)
+	return InstallSystemPackages(packages)
+}
+
+// EnsureRuntimeRequirements ensures runtime dependencies
+func EnsureRuntimeRequirements() error {
+	missing, err := CheckSystemRequirements(Runtime)
+	if err != nil {
+		return err
+	}
+
+	if len(missing) == 0 {
+		fmt.Println("✓ Runtime dependencies available")
+		return nil
+	}
+
+	fmt.Printf("Installing runtime dependencies...\n")
+	var packages []string
+	for _, req := range missing {
+		if req.Critical {
+			fmt.Printf("  - %s: %s (critical)\n", req.Name, req.Description)
+		} else {
+			fmt.Printf("  - %s: %s\n", req.Name, req.Description)
+		}
+		packages = append(packages, req.Packages...)
+	}
+
+	return InstallSystemPackages(packages)
 }

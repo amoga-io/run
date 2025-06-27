@@ -31,6 +31,9 @@ func (m *Manager) InstallPackage(packageName string) error {
 
 	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
 
+	// Smart suggestions before installation
+	m.provideSuggestions(pkg)
+
 	// Step 1: Check and install dependencies
 	if err := m.installDependencies(pkg); err != nil {
 		return fmt.Errorf("failed to install dependencies: %w", err)
@@ -46,6 +49,57 @@ func (m *Manager) InstallPackage(packageName string) error {
 
 	// Step 3: Execute installation script
 	return m.executeInstallScript(pkg)
+}
+
+// provideSuggestions provides smart suggestions based on package being installed
+func (m *Manager) provideSuggestions(pkg Package) {
+	essentialsPkg, essentialsExists := GetPackage("essentials")
+	if !essentialsExists {
+		return
+	}
+
+	isEssentialsInstalled := m.isPackageInstalled(essentialsPkg)
+
+	// Suggest essentials for development packages
+	if pkg.Category == "development" && !isEssentialsInstalled {
+		fmt.Printf("💡 Tip: Installing 'essentials' first provides build tools helpful for %s\n", pkg.Name)
+		fmt.Printf("💡 Run: run install essentials %s\n\n", pkg.Name)
+	}
+
+	// Suggest essentials for packages that commonly need build tools
+	buildIntensivePackages := map[string]bool{
+		"python": true,
+		"node":   true,
+		"php":    true,
+	}
+
+	if buildIntensivePackages[pkg.Name] && !isEssentialsInstalled {
+		fmt.Printf("💡 Recommended: '%s' benefits from development tools in 'essentials'\n", pkg.Name)
+		fmt.Printf("💡 Consider: run install essentials %s\n\n", pkg.Name)
+	}
+
+	// Suggest related packages
+	relatedSuggestions := map[string][]string{
+		"nginx":    {"php", "node"},
+		"postgres": {"python", "node", "java"},
+		"docker":   {"node", "python"},
+		"node":     {"pm2"},
+	}
+
+	if suggestions, exists := relatedSuggestions[pkg.Name]; exists {
+		var availableSuggestions []string
+		for _, suggestion := range suggestions {
+			if _, exists := GetPackage(suggestion); exists {
+				if !m.isPackageInstalled(Package{Name: suggestion}) {
+					availableSuggestions = append(availableSuggestions, suggestion)
+				}
+			}
+		}
+		if len(availableSuggestions) > 0 {
+			fmt.Printf("💡 Commonly used with %s: %s\n", pkg.Name, strings.Join(availableSuggestions, ", "))
+			fmt.Printf("💡 Install together: run install %s %s\n\n", pkg.Name, strings.Join(availableSuggestions, " "))
+		}
+	}
 }
 
 // installDependencies checks and installs required dependencies

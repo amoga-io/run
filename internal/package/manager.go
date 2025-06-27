@@ -204,10 +204,12 @@ func (m *Manager) executeInstallScript(pkg Package) error {
 		"NEEDRESTART_MODE=a", // Automatic restart services
 	)
 
-	// Run silently but capture errors
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("installation script failed: %w\nOutput: %s", err, string(output))
+	// Stream output live to the user
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("installation script failed: %w", err)
 	}
 
 	// Verify installation
@@ -242,10 +244,12 @@ func (m *Manager) executeInstallScriptWithArgs(pkg Package, extraArgs []string) 
 		"NEEDRESTART_MODE=a", // Automatic restart services
 	)
 
-	// Run silently but capture errors
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("installation script failed: %w\nOutput: %s", err, string(output))
+	// Stream output live to the user
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("installation script failed: %w", err)
 	}
 
 	// Verify installation

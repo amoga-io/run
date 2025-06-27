@@ -26,6 +26,9 @@ func Execute() {
 }
 
 func init() {
-	// Only add the update command for now
+	// Add all commands to root
 	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(removeCmd)
 }

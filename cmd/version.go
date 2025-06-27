@@ -29,7 +29,3 @@ func runVersion(cmd *cobra.Command, args []string) {
 	fmt.Printf("Go version: %s\n", GoVersion)
 	fmt.Printf("OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 }
-
-func init() {
-	rootCmd.AddCommand(versionCmd)
-}

@@ -33,10 +33,15 @@ func RequiredDependencies() []Dependency {
 	}
 }
 
+// CommandExists checks if a command is available in PATH
+func CommandExists(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
+}
+
 // CheckDependency checks if a single dependency is available
 func CheckDependency(dep Dependency) bool {
-	_, err := exec.LookPath(dep.Command)
-	return err == nil
+	return CommandExists(dep.Command)
 }
 
 // CheckAllDependencies checks all required dependencies
@@ -50,6 +55,68 @@ func CheckAllDependencies() ([]Dependency, error) {
 	}
 
 	return missing, nil
+}
+
+// InstallSystemPackages installs system packages via apt (silent)
+func InstallSystemPackages(packages []string) error {
+	if len(packages) == 0 {
+		return nil
+	}
+
+	// Update package list silently
+	updateCmd := exec.Command("sudo", "apt-get", "update", "-qq")
+	updateCmd.Env = append(updateCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+	if err := updateCmd.Run(); err != nil {
+		return fmt.Errorf("failed to update package list: %w", err)
+	}
+
+	// Install packages silently
+	args := append([]string{"apt-get", "install", "-y", "-qq", "--no-install-recommends"}, packages...)
+	installCmd := exec.Command("sudo", args...)
+	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("failed to install packages %v: %w", packages, err)
+	}
+
+	return nil
+}
+
+// ExecuteCommands executes a series of shell commands with proper error handling
+func ExecuteCommands(commands [][]string) error {
+	for _, cmdArgs := range commands {
+		if len(cmdArgs) == 0 {
+			continue
+		}
+
+		// Handle shell operators like || true
+		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" && cmdArgs[len(cmdArgs)-1] == "true" {
+			// Execute command and ignore errors if || true
+			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
+			cmd.Run() // Ignore error as intended
+			continue
+		}
+
+		// Handle other shell operators like ||
+		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" {
+			// Execute main command, if it fails, execute the fallback
+			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
+			if err := cmd.Run(); err != nil {
+				// Execute fallback command
+				fallbackCmd := exec.Command(cmdArgs[len(cmdArgs)-1])
+				fallbackCmd.Run()
+			}
+			continue
+		}
+
+		// Regular command execution
+		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+		if err := cmd.Run(); err != nil {
+			// Continue with other commands for removal operations but log the error
+			fmt.Printf("Warning: command failed: %v (continuing...)\n", cmdArgs)
+		}
+	}
+	return nil
 }
 
 // InstallDependencies installs missing dependencies on Ubuntu/Debian systems

@@ -36,10 +36,16 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	// Check if repository exists
 	if _, err := os.Stat(repoDir); os.IsNotExist(err) {
-		return fmt.Errorf("repository not found at %s. Please reinstall using curl command", repoDir)
+		// Repository doesn't exist, clone it
+		fmt.Println("Cloning repository...")
+		cloneCmd := exec.Command("git", "clone", "https://github.com/amoga-io/run.git", repoDir)
+		if err := cloneCmd.Run(); err != nil {
+			return fmt.Errorf("failed to clone repository: %w", err)
+		}
+		fmt.Println("✓ Repository cloned")
+	} else {
+		fmt.Printf("Found repository at: %s\n", repoDir)
 	}
-
-	fmt.Printf("Found repository at: %s\n", repoDir)
 
 	// Change to repository directory
 	originalDir, err := os.Getwd()
@@ -61,15 +67,37 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not a git repository. Please reinstall using curl command")
 	}
 
-	// Pull latest changes
+	// Force clean update to handle local changes
 	fmt.Println("Pulling latest changes...")
-	pullCmd := exec.Command("git", "pull", "origin", "main")
-	pullCmd.Stdout = os.Stdout
-	pullCmd.Stderr = os.Stderr
 
-	if err := pullCmd.Run(); err != nil {
-		return fmt.Errorf("failed to pull latest changes: %w", err)
+	// Fetch latest changes
+	fetchCmd := exec.Command("git", "fetch", "origin", "main")
+	if err := fetchCmd.Run(); err != nil {
+		return fmt.Errorf("failed to fetch latest changes: %w", err)
 	}
+
+	// Check if we have local changes
+	statusCmd := exec.Command("git", "status", "--porcelain")
+	statusOutput, _ := statusCmd.Output()
+
+	if len(statusOutput) > 0 {
+		fmt.Println("⚠️  Local changes detected, forcing clean update...")
+		// Stash any local changes
+		stashCmd := exec.Command("git", "stash", "push", "-m", "Auto-stash before update")
+		stashCmd.Run() // Don't fail if nothing to stash
+	}
+
+	// Hard reset to match remote (overwrites local changes)
+	resetCmd := exec.Command("git", "reset", "--hard", "origin/main")
+	if err := resetCmd.Run(); err != nil {
+		return fmt.Errorf("failed to reset to latest changes: %w", err)
+	}
+
+	// Clean any untracked files
+	cleanCmd := exec.Command("git", "clean", "-fd")
+	cleanCmd.Run() // Don't fail on this
+
+	fmt.Println("✓ Repository updated to latest version")
 
 	// Prepare Go modules
 	fmt.Println("Preparing Go modules...")

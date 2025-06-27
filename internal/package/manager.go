@@ -343,104 +343,173 @@ func (m *Manager) removePython() error {
 
 func (m *Manager) removeNode() error {
 	fmt.Println("Stopping Node.js processes...")
-	commands := [][]string{
-		{"sudo", "pkill", "-f", "node", "||", "true"},
-		{"sudo", "apt-get", "purge", "-y", "-qq", "nodejs", "npm"},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".npm")},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".npm-global")},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".node-gyp")},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".node_repl_history")},
-		{"sudo", "rm", "-rf", "/usr/local/lib/node_modules"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/node*"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/npm*"},
-		{"sudo", "apt-get", "autoremove", "-y", "-qq"},
+	userVersions := []string{"18", "20"}
+	removedAny := false
+	for _, v := range userVersions {
+		fmt.Printf("Attempting to remove Node.js %s...\n", v)
+		commands := [][]string{
+			{"sudo", "apt-get", "purge", "-y", "nodejs", "npm"},
+			{"sudo", "apt-get", "autoremove", "-y"},
+			{"sudo", "rm", "-rf", "/usr/local/lib/node_modules"},
+			{"sudo", "rm", "-rf", "/usr/local/bin/node*"},
+			{"sudo", "rm", "-rf", "/usr/local/bin/npm*"},
+			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".npm")},
+			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".npm-global")},
+			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".node-gyp")},
+			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".node_repl_history")},
+		}
+		m.executeRemovalCommands("Node.js "+v, commands)
+		removedAny = true
 	}
-	return m.executeRemovalCommands("Node.js", commands)
+	if !removedAny {
+		fmt.Println("No user-installed Node.js versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removeDocker() error {
 	fmt.Println("Stopping Docker services...")
-	commands := [][]string{
-		{"sudo", "systemctl", "stop", "docker", "||", "true"},
-		{"sudo", "systemctl", "stop", "docker.socket", "||", "true"},
-		{"sudo", "apt-get", "purge", "-y", "-qq", "docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"},
-		{"sudo", "rm", "-rf", "/var/lib/docker"},
-		{"sudo", "rm", "-rf", "/var/lib/containerd"},
-		{"sudo", "rm", "-rf", "/etc/docker"},
-		{"sudo", "rm", "-f", "/etc/apt/sources.list.d/docker.list"},
-		{"sudo", "rm", "-f", "/etc/apt/keyrings/docker.gpg"},
-		{"sudo", "groupdel", "docker", "||", "true"},
-		{"sudo", "apt-get", "autoremove", "-y", "-qq"},
+	userVersions := []string{"latest"} // Add more if you support versioned Docker installs
+	removedAny := false
+	for _, v := range userVersions {
+		fmt.Printf("Attempting to remove Docker %s...\n", v)
+		commands := [][]string{
+			{"sudo", "systemctl", "stop", "docker", "||", "true"},
+			{"sudo", "systemctl", "stop", "docker.socket", "||", "true"},
+			{"sudo", "apt-get", "purge", "-y", "docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"},
+			{"sudo", "rm", "-rf", "/var/lib/docker"},
+			{"sudo", "rm", "-rf", "/var/lib/containerd"},
+			{"sudo", "rm", "-rf", "/etc/docker"},
+			{"sudo", "rm", "-f", "/etc/apt/sources.list.d/docker.list"},
+			{"sudo", "rm", "-f", "/etc/apt/keyrings/docker.gpg"},
+			{"sudo", "groupdel", "docker", "||", "true"},
+			{"sudo", "apt-get", "autoremove", "-y"},
+		}
+		m.executeRemovalCommands("Docker "+v, commands)
+		removedAny = true
 	}
-	return m.executeRemovalCommands("Docker", commands)
+	if !removedAny {
+		fmt.Println("No user-installed Docker versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removeNginx() error {
 	fmt.Println("Stopping Nginx services...")
-	commands := [][]string{
-		{"sudo", "systemctl", "stop", "nginx", "||", "true"},
-		{"sudo", "systemctl", "disable", "nginx", "||", "true"},
-		{"sudo", "apt-get", "purge", "-y", "-qq", "nginx", "nginx-*"},
-		{"sudo", "rm", "-rf", "/etc/nginx"},
-		{"sudo", "rm", "-rf", "/var/log/nginx"},
-		{"sudo", "rm", "-rf", "/var/lib/nginx"},
-		{"sudo", "rm", "-rf", "/usr/share/nginx"},
-		{"sudo", "userdel", "www-data", "||", "true"},
-		{"sudo", "apt-get", "autoremove", "-y", "-qq"},
+	userVersions := []string{"mainline", "stable"}
+	removedAny := false
+	for _, v := range userVersions {
+		fmt.Printf("Attempting to remove Nginx %s...\n", v)
+		commands := [][]string{
+			{"sudo", "systemctl", "stop", "nginx", "||", "true"},
+			{"sudo", "systemctl", "disable", "nginx", "||", "true"},
+			{"sudo", "apt-get", "purge", "-y", "nginx", "nginx-*"},
+			{"sudo", "rm", "-rf", "/etc/nginx"},
+			{"sudo", "rm", "-rf", "/var/log/nginx"},
+			{"sudo", "rm", "-rf", "/var/lib/nginx"},
+			{"sudo", "rm", "-rf", "/usr/share/nginx"},
+			{"sudo", "userdel", "www-data", "||", "true"},
+			{"sudo", "apt-get", "autoremove", "-y"},
+		}
+		m.executeRemovalCommands("Nginx "+v, commands)
+		removedAny = true
 	}
-	return m.executeRemovalCommands("Nginx", commands)
+	if !removedAny {
+		fmt.Println("No user-installed Nginx versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removePostgres() error {
 	fmt.Println("Stopping PostgreSQL services...")
-	commands := [][]string{
-		{"sudo", "systemctl", "stop", "postgresql", "||", "true"},
-		{"sudo", "systemctl", "disable", "postgresql", "||", "true"},
-		{"sudo", "apt-get", "purge", "-y", "-qq", "postgresql*", "postgresql-*"},
-		{"sudo", "rm", "-rf", "/etc/postgresql"},
-		{"sudo", "rm", "-rf", "/var/lib/postgresql"},
-		{"sudo", "rm", "-rf", "/var/log/postgresql"},
-		{"sudo", "userdel", "postgres", "||", "true"},
-		{"sudo", "groupdel", "postgres", "||", "true"},
-		{"sudo", "apt-get", "autoremove", "-y", "-qq"},
+	userVersions := []string{"15", "16", "17"}
+	removedAny := false
+	for _, v := range userVersions {
+		fmt.Printf("Attempting to remove PostgreSQL %s...\n", v)
+		commands := [][]string{
+			{"sudo", "systemctl", "stop", "postgresql", "||", "true"},
+			{"sudo", "systemctl", "disable", "postgresql", "||", "true"},
+			{"sudo", "apt-get", "purge", "-y", fmt.Sprintf("postgresql-%s", v)},
+			{"sudo", "rm", "-rf", fmt.Sprintf("/etc/postgresql/%s", v)},
+			{"sudo", "rm", "-rf", "/var/lib/postgresql"},
+			{"sudo", "rm", "-rf", "/var/log/postgresql"},
+			{"sudo", "userdel", "postgres", "||", "true"},
+			{"sudo", "groupdel", "postgres", "||", "true"},
+			{"sudo", "apt-get", "autoremove", "-y"},
+		}
+		m.executeRemovalCommands("PostgreSQL "+v, commands)
+		removedAny = true
 	}
-	return m.executeRemovalCommands("PostgreSQL", commands)
+	if !removedAny {
+		fmt.Println("No user-installed PostgreSQL versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removePHP() error {
 	fmt.Println("Stopping PHP services...")
-	commands := [][]string{
-		{"sudo", "systemctl", "stop", "php*-fpm", "||", "true"},
-		{"sudo", "apt-get", "purge", "-y", "-qq", "php*", "php*-*"},
-		{"sudo", "rm", "-rf", "/etc/php"},
-		{"sudo", "rm", "-rf", "/var/lib/php"},
-		{"sudo", "rm", "-rf", "/var/log/php*"},
-		{"sudo", "rm", "-rf", "/usr/share/php*"},
-		{"sudo", "apt-get", "autoremove", "-y", "-qq"},
+	userVersions := []string{"8.1", "8.2", "8.3"}
+	removedAny := false
+	for _, v := range userVersions {
+		fmt.Printf("Attempting to remove PHP %s...\n", v)
+		commands := [][]string{
+			{"sudo", "systemctl", "stop", fmt.Sprintf("php%s-fpm", v), "||", "true"},
+			{"sudo", "apt-get", "purge", "-y", fmt.Sprintf("php%s", v), fmt.Sprintf("php%s-fpm", v), fmt.Sprintf("php%s-common", v)},
+			{"sudo", "rm", "-rf", "/etc/php"},
+			{"sudo", "rm", "-rf", "/var/lib/php"},
+			{"sudo", "rm", "-rf", "/var/log/php*"},
+			{"sudo", "rm", "-rf", "/usr/share/php*"},
+			{"sudo", "apt-get", "autoremove", "-y"},
+		}
+		m.executeRemovalCommands("PHP "+v, commands)
+		removedAny = true
 	}
-	return m.executeRemovalCommands("PHP", commands)
+	if !removedAny {
+		fmt.Println("No user-installed PHP versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removeJava() error {
 	fmt.Println("Removing Java...")
-	commands := [][]string{
-		{"sudo", "apt-get", "purge", "-y", "-qq", "openjdk-*", "default-jdk", "default-jre"},
-		{"sudo", "rm", "-rf", "/usr/lib/jvm"},
-		{"sudo", "rm", "-rf", "/usr/share/java"},
-		{"sudo", "sed", "-i", "/JAVA_HOME/d", "/etc/environment"},
-		{"sudo", "apt-get", "autoremove", "-y", "-qq"},
+	userVersions := []string{"11", "17", "21"}
+	removedAny := false
+	for _, v := range userVersions {
+		fmt.Printf("Attempting to remove Java %s...\n", v)
+		commands := [][]string{
+			{"sudo", "apt-get", "purge", "-y", fmt.Sprintf("openjdk-%s-jdk", v), fmt.Sprintf("openjdk-%s-jre", v)},
+			{"sudo", "rm", "-rf", "/usr/lib/jvm"},
+			{"sudo", "rm", "-rf", "/usr/share/java"},
+			{"sudo", "sed", "-i", "/JAVA_HOME/d", "/etc/environment"},
+			{"sudo", "apt-get", "autoremove", "-y"},
+		}
+		m.executeRemovalCommands("Java "+v, commands)
+		removedAny = true
 	}
-	return m.executeRemovalCommands("Java", commands)
+	if !removedAny {
+		fmt.Println("No user-installed Java versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removePM2() error {
 	fmt.Println("Stopping PM2 processes...")
-	commands := [][]string{
-		{"pm2", "kill", "||", "true"},
-		{"npm", "uninstall", "-g", "pm2", "||", "true"},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".pm2")},
+	userVersions := []string{"latest"} // Add more if you support versioned pm2 installs
+	removedAny := false
+	for _, v := range userVersions {
+		fmt.Printf("Attempting to remove PM2 %s...\n", v)
+		commands := [][]string{
+			{"pm2", "kill", "||", "true"},
+			{"npm", "uninstall", "-g", "pm2", "||", "true"},
+			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".pm2")},
+		}
+		m.executeRemovalCommands("PM2 "+v, commands)
+		removedAny = true
 	}
-	return m.executeRemovalCommands("PM2", commands)
+	if !removedAny {
+		fmt.Println("No user-installed PM2 versions found to remove.")
+	}
+	return nil
 }
 
 func (m *Manager) removeEssentials() error {

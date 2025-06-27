@@ -169,7 +169,7 @@ func (m *Manager) executeInstallScript(pkg Package) error {
 	}
 
 	// Set environment for silent installation
-	cmd := exec.Command("bash", scriptPath)
+	cmd := exec.Command("sudo", "bash", scriptPath)
 	cmd.Env = append(os.Environ(),
 		"DEBIAN_FRONTEND=noninteractive",
 		"NEEDRESTART_MODE=a", // Automatic restart services

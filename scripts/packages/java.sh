@@ -1,46 +1,51 @@
 #!/bin/bash
 
-export DEBIAN_FRONTEND=noninteractive
-set -euo pipefail
+# Function to check if Java is installed
+check_java() {
+    if java -version &>/dev/null; then
+        echo "Java is already installed."
+        java -version
+        return 0
+    else
+        echo "Java is not installed."
+        return 1
+    fi
+}
 
-status_update() { echo "  $1"; }
-step_complete() { echo "✓ $1"; }
-step_error() { echo "❌ $1"; exit 1; }
+# Function to install Java
+install_java() {
+    echo "Available Java versions to install: 11, 17, 21"
+    read -p "Enter the Java version you want to install: " java_version
 
-echo "☕ Installing Java 17..."
+    case "$java_version" in
+        11)
+            sudo apt install -y openjdk-11-jdk
+            ;;
+        17)
+            sudo apt install -y openjdk-17-jdk
+            ;;
+        21)
+            sudo apt install -y openjdk-21-jdk
+            ;;
+        *)
+            echo "Invalid selection. Please choose 11, 17, or 21."
+            exit 1
+            ;;
+    esac
+}
 
-# Update package list silently
-status_update "Updating package lists..."
-sudo apt-get update -qq >/dev/null 2>&1 || step_error "Failed to update package lists"
-step_complete "Package lists updated"
+# Function to set default Java version
+set_java_version() {
+    echo "Setting Java version..."
+    sudo update-alternatives --config java
+}
 
-# Install Java 17 (most stable for enterprise)
-status_update "Installing OpenJDK 17..."
-sudo apt-get install -y -qq openjdk-17-jdk >/dev/null 2>&1 || step_error "Failed to install OpenJDK 17"
-step_complete "OpenJDK 17 installed"
+# Main script execution
+echo "Checking if Java is installed..."
+check_java || install_java
 
-# Set as default Java version
-status_update "Configuring Java alternatives..."
-if ! sudo update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-17-openjdk-amd64/bin/java 1 >/dev/null 2>&1; then
-    echo "Warning: Failed to set java alternative, but Java is installed"
-fi
-if ! sudo update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac 1 >/dev/null 2>&1; then
-    echo "Warning: Failed to set javac alternative, but Java is installed"
-fi
-step_complete "Java alternatives configured"
+# Activate the selected Java version
+set_java_version
 
-# Set JAVA_HOME environment variable
-status_update "Setting JAVA_HOME environment variable..."
-echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' | sudo tee -a /etc/environment >/dev/null 2>&1
-step_complete "JAVA_HOME environment variable set"
-
-# Verify installation
-status_update "Verifying Java installation..."
-if java -version >/dev/null 2>&1; then
-    step_complete "Java installation verified"
-    echo "  $(java -version 2>&1 | head -n 1)"
-else
-    step_error "Java installation verification failed"
-fi
-
-echo "🎉 Java 17 installed successfully!"
+echo "Java installation and setup complete!"
+java -version

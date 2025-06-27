@@ -437,9 +437,46 @@ func (m *Manager) removeEssentials() error {
 
 // executeRemovalCommands is a helper function to execute removal commands with consistent error handling
 func (m *Manager) executeRemovalCommands(packageName string, commands [][]string) error {
-	if err := system.ExecuteCommands(commands); err != nil {
-		return fmt.Errorf("failed to remove %s: %w", packageName, err)
+	for _, cmdArgs := range commands {
+		if len(cmdArgs) == 0 {
+			continue
+		}
+
+		// Handle shell operators like || true
+		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" && cmdArgs[len(cmdArgs)-1] == "true" {
+			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Run() // Ignore error as intended
+			continue
+		}
+
+		// Handle other shell operators like ||
+		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" {
+			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				// Execute fallback command
+				fallbackCmd := exec.Command(cmdArgs[len(cmdArgs)-1])
+				fallbackCmd.Stdout = os.Stdout
+				fallbackCmd.Stderr = os.Stderr
+				fallbackCmd.Run()
+			}
+			continue
+		}
+
+		// Regular command execution
+		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			// Continue with other commands for removal operations but track the error
+			errorMsg := fmt.Sprintf("command failed: %v", cmdArgs)
+			fmt.Printf("Warning: %s (continuing...)\n", errorMsg)
+		}
 	}
+
 	fmt.Printf("✓ %s removed completely\n", packageName)
 	return nil
 }

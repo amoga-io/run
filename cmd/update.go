@@ -28,7 +28,11 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Find the repository directory
-	repoDir := filepath.Join(os.Getenv("HOME"), ".run")
+	homeDir := os.Getenv("HOME")
+	if homeDir == "" {
+		return fmt.Errorf("HOME environment variable is not set")
+	}
+	repoDir := filepath.Join(homeDir, ".run")
 
 	// Check if repository exists
 	if _, err := os.Stat(repoDir); os.IsNotExist(err) {

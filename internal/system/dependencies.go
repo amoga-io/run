@@ -3,6 +3,7 @@ package system
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // RequirementCategory defines different types of system requirements
@@ -104,6 +105,8 @@ func InstallSystemPackages(packages []string) error {
 
 // ExecuteCommands executes a series of shell commands with proper error handling
 func ExecuteCommands(commands [][]string) error {
+	var errors []string
+
 	for _, cmdArgs := range commands {
 		if len(cmdArgs) == 0 {
 			continue
@@ -124,7 +127,9 @@ func ExecuteCommands(commands [][]string) error {
 			if err := cmd.Run(); err != nil {
 				// Execute fallback command
 				fallbackCmd := exec.Command(cmdArgs[len(cmdArgs)-1])
-				fallbackCmd.Run()
+				if fallbackErr := fallbackCmd.Run(); fallbackErr != nil {
+					errors = append(errors, fmt.Sprintf("command failed: %v (fallback also failed)", cmdArgs))
+				}
 			}
 			continue
 		}
@@ -132,10 +137,18 @@ func ExecuteCommands(commands [][]string) error {
 		// Regular command execution
 		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 		if err := cmd.Run(); err != nil {
-			// Continue with other commands for removal operations but log the error
-			fmt.Printf("Warning: command failed: %v (continuing...)\n", cmdArgs)
+			// Continue with other commands for removal operations but track the error
+			errorMsg := fmt.Sprintf("command failed: %v", cmdArgs)
+			fmt.Printf("Warning: %s (continuing...)\n", errorMsg)
+			errors = append(errors, errorMsg)
 		}
 	}
+
+	// Return aggregated errors if any occurred
+	if len(errors) > 0 {
+		return fmt.Errorf("some commands failed: %s", strings.Join(errors, "; "))
+	}
+
 	return nil
 }
 

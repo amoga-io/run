@@ -104,12 +104,6 @@ bootstrap_dependencies() {
         echo "✓ Bootstrap dependencies already available"
     fi
 }
-        
-        echo "✓ Dependencies installed successfully"
-    else
-        echo "✓ All required dependencies are available"
-    fi
-}
 
 # Check if running on Ubuntu/Debian (don't warn, just note)
 if ! grep -q -i "ubuntu\|debian" /etc/os-release 2>/dev/null; then

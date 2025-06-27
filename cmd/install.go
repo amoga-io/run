@@ -23,8 +23,7 @@ func init() {
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
-	// Handle special commands
-	if len(args) == 1 && args[0] == "list" {
+	if len(args) == 0 || (len(args) == 1 && args[0] == "list") {
 		return listPackages()
 	}
 

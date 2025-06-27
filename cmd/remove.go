@@ -16,6 +16,9 @@ var removeCmd = &cobra.Command{
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return listPackages()
+	}
 	// Validate packages exist before starting removal
 	for _, packageName := range args {
 		if _, exists := pkg.GetPackage(packageName); !exists {

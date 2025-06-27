@@ -1,6 +1,14 @@
 # Run CLI
 
-A minimal Git-based CLI tool for Ubuntu systems with self-install and update capabilities.
+A safe, Git-based CLI tool for managing developer and system packages on Ubuntu servers and VMs.
+
+## Features
+
+- Install, update, and remove packages (Node.js, Python, PHP, Docker, Nginx, Postgres, Java, PM2, and more)
+- Safe removal: only user-installed versions are removed, never system/essential packages
+- Version selection: install or remove specific versions with `--version`
+- Self-updating and self-verifying
+- Designed for enterprise VM/server use
 
 ## Quick Install
 
@@ -10,87 +18,71 @@ curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/scripts/install.s
 
 ## Usage
 
-```bash
-# Show help
-run --help
+### List available packages
 
-# Show version information
+```bash
+run install list
+```
+
+### Install a package (default version)
+
+```bash
+run install node
+```
+
+### Install a specific version
+
+```bash
+run install node --version 18
+run install python --version 3.10
+```
+
+### Remove a package (user-installed versions only)
+
+```bash
+run remove node
+run remove python --version 3.10
+```
+
+### Show version info
+
+```bash
 run version
-
-# Update to latest version
-run update
 ```
 
-## Requirements
-
-- Ubuntu/Debian system
-- sudo privileges
-- Internet connection
-
-The installer automatically handles Git and Go dependencies.
-
-## Update
-
-The CLI can update itself from the Git repository:
+### Update the CLI
 
 ```bash
 run update
 ```
 
-This pulls the latest changes, rebuilds the binary, and atomically replaces the installed version.
+## Safe Removal
 
-## Uninstallation
+- To remove a package, run:
+  ```
+  run remove node
+  run remove python --version 3.10
+  ```
+- Only user-installed versions are removed. System/essential versions are never touched.
+- After removal, the system is ready for a fresh install of any supported version.
+- To see all available packages, run:
+  ```
+  run install list
+  ```
 
-To completely remove the CLI:
+## Safety
 
-```bash
-# Remove binary
-sudo rm -f /usr/local/bin/run
+- The CLI will **never remove system or essential package versions** (e.g., system Python).
+- Only user-installed versions (listed in the code) are targeted for removal.
+- Always review the list of user versions in the code and update as needed for your environment.
 
-# Remove repository and cache
-rm -rf ~/.run
-
-# Optional: Remove auto-installed dependencies
-# sudo apt remove git golang-go
-```
-
-## Installation Details
-
-- **Binary location**: `/usr/local/bin/run`
-- **Repository cache**: `~/.run/`
-- **Dependencies**: git, golang-go (auto-installed if missing)
-
-## Enterprise Notes
-
-This tool is designed for internal enterprise use with Git-based versioning:
-
-1. **Versioning**: Uses Git tags for semantic versioning (v1.0.0, v1.2.3, etc.)
-2. **Releases**: GitHub Actions automatically creates releases when tags are pushed
-3. **Installation**: Always builds from source with proper version embedding
-4. **Updates**: Self-updating mechanism maintains version consistency
-
-The installation process:
-
-1. Verifies system compatibility (Ubuntu/Debian)
-2. Checks and installs required dependencies
-3. Clones repository to `~/.run/` for persistent updates
-4. Builds with version information embedded from Git
-5. Installs binary to `/usr/local/bin/` using atomic operations
-
-## Versioning
-
-The CLI uses Git-based versioning:
+## Help
 
 ```bash
-# Create and push a new version
-git tag v1.0.0
-git push origin v1.0.0
-
-# This triggers GitHub Actions to create a release
-# Next installation will show the new version
+run --help
+run install --help
+run remove --help
 ```
-
-Default version is `v0.0.0` when no tags exist.
 
 ## License
 

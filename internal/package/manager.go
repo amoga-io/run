@@ -15,11 +15,26 @@ type Manager struct {
 }
 
 func NewManager() (*Manager, error) {
-	repoPath := filepath.Join(os.Getenv("HOME"), ".run")
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("repository not found at %s. Please reinstall CLI", repoPath)
+	repoPath, err := GetRepoPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository path: %w", err)
 	}
-	return &Manager{repoPath: repoPath}, nil
+
+	homeDir := os.Getenv("HOME")
+	if homeDir == "" {
+		return nil, fmt.Errorf("HOME environment variable is not set")
+	}
+
+	resolvedPath, err := repoPath.Resolve(homeDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve repository path: %w", err)
+	}
+
+	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("repository not found at %s. Please reinstall CLI", resolvedPath)
+	}
+
+	return &Manager{repoPath: resolvedPath}, nil
 }
 
 // InstallPackage installs a package with dependency checking
@@ -184,27 +199,31 @@ func (m *Manager) isPackageInstalled(pkg Package) bool {
 
 // executeInstallScript runs the package installation script
 func (m *Manager) executeInstallScript(pkg Package) error {
-	scriptPath := filepath.Join(m.repoPath, pkg.ScriptPath)
+	// Validate script path
+	scriptPath, err := ValidatePath(pkg.ScriptPath)
+	if err != nil {
+		return fmt.Errorf("invalid script path: %w", err)
+	}
 
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		return fmt.Errorf("installation script not found: %s", scriptPath)
+	resolvedScriptPath, err := scriptPath.Resolve(m.repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve script path: %w", err)
+	}
+
+	if _, err := os.Stat(resolvedScriptPath); os.IsNotExist(err) {
+		return fmt.Errorf("installation script not found: %s", resolvedScriptPath)
 	}
 
 	fmt.Printf("Executing installation script for %s...\n", pkg.Name)
 
 	// Make script executable
-	if err := os.Chmod(scriptPath, 0755); err != nil {
+	if err := os.Chmod(resolvedScriptPath, 0755); err != nil {
 		return fmt.Errorf("failed to make script executable: %w", err)
 	}
 
 	// Set environment for silent installation
-	cmd := exec.Command("sudo", "bash", scriptPath)
-	cmd.Env = append(os.Environ(),
-		"DEBIAN_FRONTEND=noninteractive",
-		"NEEDRESTART_MODE=a", // Automatic restart services
-	)
-
-	// Stream output live to the user
+	cmd := exec.Command(resolvedScriptPath)
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -217,34 +236,37 @@ func (m *Manager) executeInstallScript(pkg Package) error {
 		return fmt.Errorf("package installation verification failed - commands not available: %s", strings.Join(pkg.Commands, ", "))
 	}
 
-	fmt.Printf("✓ Successfully installed %s\n", pkg.Name)
+	fmt.Printf("✓ %s installed successfully\n", pkg.Name)
 	return nil
 }
 
 // executeInstallScriptWithArgs runs the package installation script with extra arguments
 func (m *Manager) executeInstallScriptWithArgs(pkg Package, extraArgs []string) error {
-	scriptPath := filepath.Join(m.repoPath, pkg.ScriptPath)
-
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		return fmt.Errorf("installation script not found: %s", scriptPath)
+	// Validate script path
+	scriptPath, err := ValidatePath(pkg.ScriptPath)
+	if err != nil {
+		return fmt.Errorf("invalid script path: %w", err)
 	}
 
-	fmt.Printf("Executing installation script for %s...\n", pkg.Name)
+	resolvedScriptPath, err := scriptPath.Resolve(m.repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve script path: %w", err)
+	}
+
+	if _, err := os.Stat(resolvedScriptPath); os.IsNotExist(err) {
+		return fmt.Errorf("installation script not found: %s", resolvedScriptPath)
+	}
+
+	fmt.Printf("Executing installation script for %s with arguments...\n", pkg.Name)
 
 	// Make script executable
-	if err := os.Chmod(scriptPath, 0755); err != nil {
+	if err := os.Chmod(resolvedScriptPath, 0755); err != nil {
 		return fmt.Errorf("failed to make script executable: %w", err)
 	}
 
 	// Set environment for silent installation
-	cmdArgs := append([]string{"bash", scriptPath}, extraArgs...)
-	cmd := exec.Command("sudo", cmdArgs...)
-	cmd.Env = append(os.Environ(),
-		"DEBIAN_FRONTEND=noninteractive",
-		"NEEDRESTART_MODE=a", // Automatic restart services
-	)
-
-	// Stream output live to the user
+	cmd := exec.Command(resolvedScriptPath, extraArgs...)
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -257,7 +279,7 @@ func (m *Manager) executeInstallScriptWithArgs(pkg Package, extraArgs []string) 
 		return fmt.Errorf("package installation verification failed - commands not available: %s", strings.Join(pkg.Commands, ", "))
 	}
 
-	fmt.Printf("✓ Successfully installed %s\n", pkg.Name)
+	fmt.Printf("✓ %s installed successfully\n", pkg.Name)
 	return nil
 }
 

@@ -2,88 +2,128 @@
 
 A safe, Git-based CLI tool for managing developer and system packages on Ubuntu servers and VMs.
 
-## Features
+---
 
-- Install, update, and remove packages (Node.js, Python, PHP, Docker, Nginx, Postgres, Java, PM2, and more)
-- Safe removal: only user-installed versions are removed, never system/essential packages
-- Version selection: install or remove specific versions with `--version`
-- Self-updating and self-verifying
-- Designed for enterprise VM/server use
-
-## Quick Install
+## 🚀 Quick Installation
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/amoga-io/run/main/scripts/install.sh | bash
 ```
 
-## Usage
+---
 
-### List available packages
+## 🧹 Uninstall
+
+```bash
+sudo rm -f /usr/local/bin/run
+rm -rf ~/.run
+```
+
+---
+
+## 📖 Commands & Flags Usage Guide
+
+### General Help
+
+```bash
+run --help
+```
+
+---
+
+### Install Packages
+
+Install one or more packages (Node.js, Python, Docker, etc.):
+
+```bash
+run install <package> [<package> ...] [flags]
+```
+
+#### Flags
+- `--version <ver>`: Install a specific version (if supported)
+- `--all`: Install all available packages
+
+#### Examples
+```bash
+run install node
+run install python --version 3.10
+run install node python docker
+run install --all
+```
+
+---
+
+### Remove Packages
+
+Remove one or more packages:
+
+```bash
+run remove <package> [<package> ...] [flags]
+```
+
+#### Flags
+- `--version <ver>`: Remove a specific version (if supported)
+- `--all`: Remove all installed packages
+
+#### Examples
+```bash
+run remove node
+run remove python --version 3.10
+run remove node python
+run remove --all
+```
+
+---
+
+### List Available Packages
 
 ```bash
 run install list
 ```
 
-### Install a package (default version)
+---
+
+### Check System & Packages
+
+Check installed packages, dependencies, or all:
 
 ```bash
-run install node
+run check packages
+run check deps
+run check all
 ```
 
-### Install a specific version
+---
 
-```bash
-run install node --version 18
-run install python --version 3.10
-```
-
-### Remove a package (user-installed versions only)
-
-```bash
-run remove node
-run remove python --version 3.10
-```
-
-### Show version info
+### Show Version
 
 ```bash
 run version
 ```
 
-### Update the CLI
+---
+
+### Update CLI
+
+Update the CLI to the latest version from Git:
 
 ```bash
 run update
 ```
 
-## Safe Removal
+---
 
-- To remove a package, run:
-  ```
-  run remove node
-  run remove python --version 3.10
-  ```
-- Only user-installed versions are removed. System/essential versions are never touched.
-- After removal, the system is ready for a fresh install of any supported version.
-- To see all available packages, run:
-  ```
-  run install list
-  ```
-
-## Safety
-
-- The CLI will **never remove system or essential package versions** (e.g., system Python).
-- Only user-installed versions (listed in the code) are targeted for removal.
-- Always review the list of user versions in the code and update as needed for your environment.
-
-## Help
+### Command-Specific Help
 
 ```bash
-run --help
 run install --help
 run remove --help
+run check --help
 ```
 
-## License
+---
 
-MIT
+## 📝 Notes
+- Only user-installed versions are removed; system/essential packages are never touched.
+- For a full list of supported packages and versions, run `run install list`.
+- This CLI is designed for Ubuntu/Debian systems.

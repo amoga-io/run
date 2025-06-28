@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/amoga-io/run/internal/logger"
 	"github.com/amoga-io/run/internal/system"
 	"github.com/spf13/cobra"
 )
@@ -166,6 +167,10 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Make executable
 	chmodCmd := exec.Command("sudo", "chmod", "+x", tempBinary)
 	if err := chmodCmd.Run(); err != nil {
+		// Clean up temp file on failure
+		if cleanupErr := exec.Command("sudo", "rm", "-f", tempBinary).Run(); cleanupErr != nil {
+			logger.Warn("Failed to cleanup temp binary after chmod failure: %v", cleanupErr)
+		}
 		return fmt.Errorf("failed to make binary executable: %w", err)
 	}
 
@@ -173,7 +178,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	mvCmd := exec.Command("sudo", "mv", tempBinary, finalBinary)
 	if err := mvCmd.Run(); err != nil {
 		// Clean up temp file on failure
-		exec.Command("sudo", "rm", "-f", tempBinary).Run()
+		if cleanupErr := exec.Command("sudo", "rm", "-f", tempBinary).Run(); cleanupErr != nil {
+			logger.Warn("Failed to cleanup temp binary after mv failure: %v", cleanupErr)
+		}
 		return fmt.Errorf("failed to replace binary: %w", err)
 	}
 

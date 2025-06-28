@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/amoga-io/run/internal/logger"
 )
 
 // RequirementCategory defines different types of system requirements
@@ -78,16 +80,40 @@ func CheckAllDependencies() ([]Dependency, error) {
 	return missing, nil
 }
 
+// validateSudoAccess checks if sudo is available and working
+func validateSudoAccess() error {
+	if !CommandExists("sudo") {
+		return fmt.Errorf("sudo command not found")
+	}
+
+	// Test sudo access with a harmless command
+	cmd := exec.Command("sudo", "-n", "true")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sudo access not available: %w", err)
+	}
+
+	return nil
+}
+
 // InstallSystemPackages installs system packages via apt (silent)
 func InstallSystemPackages(packages []string) error {
 	if len(packages) == 0 {
 		return nil
 	}
 
+	// Validate sudo access before proceeding
+	if err := validateSudoAccess(); err != nil {
+		return fmt.Errorf("sudo validation failed: %w", err)
+	}
+
+	log := logger.GetLogger().WithOperation("install_system_packages")
+	log.Info("Installing system packages: %v", packages)
+
 	// Update package list silently
 	updateCmd := exec.Command("sudo", "apt-get", "update", "-qq")
 	updateCmd.Env = append(updateCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 	if err := updateCmd.Run(); err != nil {
+		log.Error("Failed to update package list: %v", err)
 		return fmt.Errorf("failed to update package list: %w", err)
 	}
 
@@ -97,26 +123,33 @@ func InstallSystemPackages(packages []string) error {
 	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
 	if err := installCmd.Run(); err != nil {
+		log.Error("Failed to install packages %v: %v", packages, err)
 		return fmt.Errorf("failed to install packages %v: %w", packages, err)
 	}
 
+	log.Info("System packages installed successfully: %v", packages)
 	return nil
 }
 
 // ExecuteCommands executes a series of shell commands with proper error handling
 func ExecuteCommands(commands [][]string) error {
 	var errors []string
+	log := logger.GetLogger().WithOperation("execute_commands")
 
-	for _, cmdArgs := range commands {
+	for i, cmdArgs := range commands {
 		if len(cmdArgs) == 0 {
 			continue
 		}
+
+		log.Info("Executing command %d: %v", i, cmdArgs)
 
 		// Handle shell operators like || true
 		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" && cmdArgs[len(cmdArgs)-1] == "true" {
 			// Execute command and ignore errors if || true
 			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
-			cmd.Run() // Ignore error as intended
+			if err := cmd.Run(); err != nil {
+				log.Warn("Command failed (ignored due to || true): %v - %v", cmdArgs, err)
+			}
 			continue
 		}
 
@@ -125,9 +158,11 @@ func ExecuteCommands(commands [][]string) error {
 			// Execute main command, if it fails, execute the fallback
 			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
 			if err := cmd.Run(); err != nil {
+				log.Warn("Main command failed, trying fallback: %v - %v", cmdArgs, err)
 				// Execute fallback command
 				fallbackCmd := exec.Command(cmdArgs[len(cmdArgs)-1])
 				if fallbackErr := fallbackCmd.Run(); fallbackErr != nil {
+					log.Error("Fallback command also failed: %v (fallback error: %v)", cmdArgs, fallbackErr)
 					errors = append(errors, fmt.Sprintf("command failed: %v (fallback also failed)", cmdArgs))
 				}
 			}
@@ -139,6 +174,7 @@ func ExecuteCommands(commands [][]string) error {
 		if err := cmd.Run(); err != nil {
 			// Continue with other commands for removal operations but track the error
 			errorMsg := fmt.Sprintf("command failed: %v", cmdArgs)
+			log.Warn("Command failed: %v - %v", cmdArgs, err)
 			fmt.Printf("Warning: %s (continuing...)\n", errorMsg)
 			errors = append(errors, errorMsg)
 		}
@@ -158,24 +194,35 @@ func InstallDependencies(missing []Dependency) error {
 		return nil
 	}
 
+	// Validate sudo access before proceeding
+	if err := validateSudoAccess(); err != nil {
+		return fmt.Errorf("sudo validation failed: %w", err)
+	}
+
+	log := logger.GetLogger().WithOperation("install_dependencies")
+	log.Info("Installing missing dependencies: %d", len(missing))
 	fmt.Println("Installing missing dependencies...")
 
 	// Update package list first
 	updateCmd := exec.Command("sudo", "apt", "update")
 	if err := updateCmd.Run(); err != nil {
+		log.Error("Failed to update package list: %v", err)
 		return fmt.Errorf("failed to update package list: %w", err)
 	}
 
 	// Install each missing dependency
 	for _, dep := range missing {
+		log.Info("Installing dependency %s (%s)", dep.Command, dep.Package)
 		fmt.Printf("Installing %s (%s)...\n", dep.Description, dep.Package)
 
 		installCmd := exec.Command("sudo", "apt", "install", "-y", dep.Package)
 		if err := installCmd.Run(); err != nil {
+			log.Error("Failed to install dependency %s (%s): %v", dep.Command, dep.Package, err)
 			return fmt.Errorf("failed to install %s: %w", dep.Package, err)
 		}
 	}
 
+	log.Info("All dependencies installed successfully")
 	return nil
 }
 
@@ -294,7 +341,7 @@ func CheckSystemRequirements(categories ...RequirementCategory) ([]SystemRequire
 func EnsureBootstrapRequirements() error {
 	missing, err := CheckSystemRequirements(Bootstrap)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check bootstrap requirements: %w", err)
 	}
 
 	if len(missing) == 0 {
@@ -316,7 +363,7 @@ func EnsureBootstrapRequirements() error {
 func EnsureRuntimeRequirements() error {
 	missing, err := CheckSystemRequirements(Runtime)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check runtime requirements: %w", err)
 	}
 
 	if len(missing) == 0 {

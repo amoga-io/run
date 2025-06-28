@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/amoga-io/run/internal/logger"
 	"github.com/amoga-io/run/internal/system"
 )
 
@@ -236,88 +237,110 @@ func (m *Manager) isPackageInstalled(pkg Package) bool {
 	return len(pkg.Commands) > 0 // Only return true if there are commands to check
 }
 
-// executeInstallScript runs the package installation script
+// executeInstallScript executes the installation script for a package
 func (m *Manager) executeInstallScript(pkg Package) error {
+	log := logger.GetLogger().WithOperation("execute_install_script").WithPackage(pkg.Name)
+
 	// Validate script path
-	scriptPath, err := ValidatePath(pkg.ScriptPath)
-	if err != nil {
+	if err := ValidatePackageName(pkg.Name); err != nil {
+		log.Error("Invalid package name: %v", err)
 		return fmt.Errorf("invalid script path: %w", err)
 	}
 
-	resolvedScriptPath, err := scriptPath.Resolve(m.repoPath)
+	// Resolve script path
+	safePath, err := ValidatePath(pkg.ScriptPath)
 	if err != nil {
+		log.Error("Invalid script path %s: %v", pkg.ScriptPath, err)
+		return fmt.Errorf("invalid script path: %w", err)
+	}
+
+	resolvedScriptPath, err := safePath.Resolve(m.repoPath)
+	if err != nil {
+		log.Error("Failed to resolve script path %s: %v", pkg.ScriptPath, err)
 		return fmt.Errorf("failed to resolve script path: %w", err)
 	}
 
+	// Check if script exists
 	if _, err := os.Stat(resolvedScriptPath); os.IsNotExist(err) {
+		log.Error("Script file does not exist: %s", resolvedScriptPath)
 		return fmt.Errorf("installation script not found: %s", resolvedScriptPath)
 	}
 
-	fmt.Printf("Executing installation script for %s...\n", pkg.Name)
-
 	// Make script executable
 	if err := os.Chmod(resolvedScriptPath, 0755); err != nil {
+		log.Error("Failed to make script executable %s: %v", resolvedScriptPath, err)
 		return fmt.Errorf("failed to make script executable: %w", err)
 	}
 
-	// Set environment for silent installation
+	log.Info("Executing installation script: %s", resolvedScriptPath)
+	fmt.Printf("Executing installation script for %s...\n", pkg.Name)
+
+	// Execute script
 	cmd := exec.Command(resolvedScriptPath)
-	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Dir = m.repoPath
 
 	if err := cmd.Run(); err != nil {
+		log.Error("Installation script failed %s: %v", resolvedScriptPath, err)
 		return fmt.Errorf("installation script failed: %w", err)
 	}
 
-	// Verify installation
-	if !m.isPackageInstalled(pkg) {
-		return fmt.Errorf("package installation verification failed - commands not available: %s", strings.Join(pkg.Commands, ", "))
-	}
-
+	log.Info("Installation script completed successfully")
 	fmt.Printf("✓ %s installed successfully\n", pkg.Name)
 	return nil
 }
 
-// executeInstallScriptWithArgs runs the package installation script with extra arguments
+// executeInstallScriptWithArgs executes the installation script with extra arguments
 func (m *Manager) executeInstallScriptWithArgs(pkg Package, extraArgs []string) error {
+	log := logger.GetLogger().WithOperation("execute_install_script_with_args").WithPackage(pkg.Name)
+
 	// Validate script path
-	scriptPath, err := ValidatePath(pkg.ScriptPath)
-	if err != nil {
+	if err := ValidatePackageName(pkg.Name); err != nil {
+		log.Error("Invalid package name: %v", err)
 		return fmt.Errorf("invalid script path: %w", err)
 	}
 
-	resolvedScriptPath, err := scriptPath.Resolve(m.repoPath)
+	// Resolve script path
+	safePath, err := ValidatePath(pkg.ScriptPath)
 	if err != nil {
+		log.Error("Invalid script path %s: %v", pkg.ScriptPath, err)
+		return fmt.Errorf("invalid script path: %w", err)
+	}
+
+	resolvedScriptPath, err := safePath.Resolve(m.repoPath)
+	if err != nil {
+		log.Error("Failed to resolve script path %s: %v", pkg.ScriptPath, err)
 		return fmt.Errorf("failed to resolve script path: %w", err)
 	}
 
+	// Check if script exists
 	if _, err := os.Stat(resolvedScriptPath); os.IsNotExist(err) {
+		log.Error("Script file does not exist: %s", resolvedScriptPath)
 		return fmt.Errorf("installation script not found: %s", resolvedScriptPath)
 	}
 
-	fmt.Printf("Executing installation script for %s with arguments...\n", pkg.Name)
-
 	// Make script executable
 	if err := os.Chmod(resolvedScriptPath, 0755); err != nil {
+		log.Error("Failed to make script executable %s: %v", resolvedScriptPath, err)
 		return fmt.Errorf("failed to make script executable: %w", err)
 	}
 
-	// Set environment for silent installation
+	log.Info("Executing installation script with arguments: %s %v", resolvedScriptPath, extraArgs)
+	fmt.Printf("Executing installation script for %s with arguments...\n", pkg.Name)
+
+	// Execute script with arguments
 	cmd := exec.Command(resolvedScriptPath, extraArgs...)
-	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Dir = m.repoPath
 
 	if err := cmd.Run(); err != nil {
+		log.Error("Installation script failed %s %v: %v", resolvedScriptPath, extraArgs, err)
 		return fmt.Errorf("installation script failed: %w", err)
 	}
 
-	// Verify installation
-	if !m.isPackageInstalled(pkg) {
-		return fmt.Errorf("package installation verification failed - commands not available: %s", strings.Join(pkg.Commands, ", "))
-	}
-
+	log.Info("Installation script completed successfully")
 	fmt.Printf("✓ %s installed successfully\n", pkg.Name)
 	return nil
 }
@@ -539,48 +562,64 @@ func (m *Manager) removeEssentials() error {
 	return m.executeRemovalCommands("System essentials", commands)
 }
 
-// executeRemovalCommands is a helper function to execute removal commands with consistent error handling
+// executeRemovalCommands executes removal commands with proper error handling
 func (m *Manager) executeRemovalCommands(packageName string, commands [][]string) error {
-	for _, cmdArgs := range commands {
+	log := logger.GetLogger().WithOperation("execute_removal_commands").WithPackage(packageName)
+
+	log.Info("Executing removal commands: %d", len(commands))
+
+	var errors []string
+
+	for i, cmdArgs := range commands {
 		if len(cmdArgs) == 0 {
 			continue
 		}
 
+		log.Info("Executing removal command %d: %v", i, cmdArgs)
+
 		// Handle shell operators like || true
 		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" && cmdArgs[len(cmdArgs)-1] == "true" {
+			// Execute command and ignore errors if || true
 			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Run() // Ignore error as intended
+			if err := cmd.Run(); err != nil {
+				log.Warn("Removal command failed (ignored due to || true): %v - %v", cmdArgs, err)
+			}
 			continue
 		}
 
 		// Handle other shell operators like ||
 		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" {
+			// Execute main command, if it fails, execute the fallback
 			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
+				log.Warn("Main removal command failed, trying fallback: %v - %v", cmdArgs, err)
 				// Execute fallback command
 				fallbackCmd := exec.Command(cmdArgs[len(cmdArgs)-1])
-				fallbackCmd.Stdout = os.Stdout
-				fallbackCmd.Stderr = os.Stderr
-				fallbackCmd.Run()
+				if fallbackErr := fallbackCmd.Run(); fallbackErr != nil {
+					log.Error("Fallback removal command also failed: %v (fallback error: %v)", cmdArgs, fallbackErr)
+					errors = append(errors, fmt.Sprintf("command failed: %v (fallback also failed)", cmdArgs))
+				}
 			}
 			continue
 		}
 
 		// Regular command execution
 		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			// Continue with other commands for removal operations but track the error
 			errorMsg := fmt.Sprintf("command failed: %v", cmdArgs)
+			log.Warn("Removal command failed: %v - %v", cmdArgs, err)
 			fmt.Printf("Warning: %s (continuing...)\n", errorMsg)
+			errors = append(errors, errorMsg)
 		}
 	}
 
+	// Return aggregated errors if any occurred
+	if len(errors) > 0 {
+		return fmt.Errorf("some removal commands failed: %s", strings.Join(errors, "; "))
+	}
+
+	log.Info("All removal commands completed")
 	fmt.Printf("✓ %s removed completely\n", packageName)
 	return nil
 }

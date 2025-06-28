@@ -62,7 +62,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		packagesToRemove = args
 	}
 
-	// Remove packages in parallel
+	// Remove packages in parallel with proper synchronization
 	results := removePackagesParallel(manager, packagesToRemove)
 
 	// Show summary
@@ -75,6 +75,10 @@ func runRemove(cmd *cobra.Command, args []string) error {
 func removePackagesParallel(manager *pkg.Manager, packages []string) []PackageResult {
 	var wg sync.WaitGroup
 	resultChan := make(chan PackageResult, len(packages))
+
+	// Use a mutex to protect shared state
+	var resultMutex sync.Mutex
+	var allResults []PackageResult
 
 	// Start goroutines for each package
 	for _, packageName := range packages {
@@ -121,10 +125,11 @@ func removePackagesParallel(manager *pkg.Manager, packages []string) []PackageRe
 		close(resultChan)
 	}()
 
-	// Collect results
-	var allResults []PackageResult
+	// Collect results with proper synchronization
 	for result := range resultChan {
+		resultMutex.Lock()
 		allResults = append(allResults, result)
+		resultMutex.Unlock()
 	}
 
 	return allResults
@@ -161,10 +166,12 @@ func showRemoveSummary(results []PackageResult) {
 	}
 
 	total := len(results)
-	fmt.Printf("\nTotal: %d packages processed\n", total)
-	fmt.Printf("Success rate: %.1f%% (%d/%d)\n", float64(len(successful))/float64(total)*100, len(successful), total)
+	if total > 0 {
+		fmt.Printf("\nTotal: %d packages processed\n", total)
+		fmt.Printf("Success rate: %.1f%% (%d/%d)\n", float64(len(successful))/float64(total)*100, len(successful), total)
 
-	if len(failed) > 0 {
-		fmt.Printf("\nTo retry failed packages: run remove %s\n", strings.Join(failed, " "))
+		if len(failed) > 0 {
+			fmt.Printf("\nTo retry failed packages: run remove %s\n", strings.Join(failed, " "))
+		}
 	}
 }

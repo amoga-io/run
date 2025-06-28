@@ -24,7 +24,8 @@ func NewDependencyGraph() *DependencyGraph {
 	}
 
 	// Build graph from package registry
-	for name, pkg := range PackageRegistry {
+	packages := ListPackages()
+	for name, pkg := range packages {
 		graph.Nodes[name] = &DependencyNode{
 			Name:         name,
 			Dependencies: pkg.Dependencies,
@@ -214,9 +215,10 @@ func ValidateDependencies() error {
 	}
 
 	// Check for missing dependencies
+	packages := ListPackages()
 	for _, node := range graph.Nodes {
 		for _, dep := range node.Dependencies {
-			if _, exists := PackageRegistry[dep]; !exists {
+			if _, exists := packages[dep]; !exists {
 				// This is a system dependency, which is fine
 				continue
 			}

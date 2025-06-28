@@ -46,6 +46,11 @@ func (m *Manager) InstallPackage(packageName string) error {
 
 	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
 
+	// Validate dependencies before installation
+	if err := ValidateDependencies(); err != nil {
+		return fmt.Errorf("dependency validation failed: %w", err)
+	}
+
 	// Smart suggestions before installation
 	m.provideSuggestions(pkg)
 
@@ -74,6 +79,11 @@ func (m *Manager) InstallPackageWithArgs(packageName string, extraArgs []string)
 	}
 
 	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
+
+	// Validate dependencies before installation
+	if err := ValidateDependencies(); err != nil {
+		return fmt.Errorf("dependency validation failed: %w", err)
+	}
 
 	// Smart suggestions before installation
 	m.provideSuggestions(pkg)

@@ -13,7 +13,7 @@ import (
 var (
 	packageVersion string
 	installAll     bool
-	installMutex   sync.RWMutex
+	// installMutex   sync.RWMutex
 )
 
 var installCmd = &cobra.Command{

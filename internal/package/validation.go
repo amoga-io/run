@@ -1,9 +1,10 @@
 package pkg
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/amoga-io/run/internal/errors"
 )
 
 // Package name validation regex - only allow alphanumeric, hyphens, and underscores
@@ -12,15 +13,15 @@ var packageNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 // ValidatePackageName validates and sanitizes package names
 func ValidatePackageName(name string) error {
 	if name == "" {
-		return fmt.Errorf("package name cannot be empty")
+		return errors.NewValidationError("package name cannot be empty", nil)
 	}
 
 	if len(name) > 50 {
-		return fmt.Errorf("package name too long (max 50 characters)")
+		return errors.NewValidationError("package name too long", nil).WithDetail("max_length", 50).WithDetail("actual_length", len(name))
 	}
 
 	if !packageNameRegex.MatchString(name) {
-		return fmt.Errorf("package name contains invalid characters (only alphanumeric, hyphens, and underscores allowed)")
+		return errors.NewValidationError("package name contains invalid characters", nil).WithDetail("allowed_chars", "alphanumeric, hyphens, underscores")
 	}
 
 	// Check for reserved names
@@ -36,7 +37,7 @@ func ValidatePackageName(name string) error {
 	}
 
 	if reservedNames[name] {
-		return fmt.Errorf("package name '%s' is reserved", name)
+		return errors.NewValidationError("package name is reserved", nil).WithDetail("reserved_name", name)
 	}
 
 	return nil
@@ -45,13 +46,13 @@ func ValidatePackageName(name string) error {
 // ValidateVersionString validates version strings
 func ValidateVersionString(version string) error {
 	if version == "" {
-		return fmt.Errorf("version cannot be empty")
+		return errors.NewValidationError("version cannot be empty", nil)
 	}
 
 	// Allow common version patterns
 	versionRegex := regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
 	if !versionRegex.MatchString(version) {
-		return fmt.Errorf("invalid version format (expected format: X.Y.Z)")
+		return errors.NewValidationError("invalid version format", nil).WithDetail("expected_format", "X.Y.Z")
 	}
 
 	return nil
@@ -60,7 +61,7 @@ func ValidateVersionString(version string) error {
 // SanitizePackageList sanitizes a list of package names
 func SanitizePackageList(packages []string) ([]string, error) {
 	if len(packages) == 0 {
-		return nil, fmt.Errorf("no packages specified")
+		return nil, errors.NewValidationError("no packages specified", nil)
 	}
 
 	var sanitized []string
@@ -73,11 +74,11 @@ func SanitizePackageList(packages []string) ([]string, error) {
 		}
 
 		if err := ValidatePackageName(pkg); err != nil {
-			return nil, fmt.Errorf("invalid package name '%s': %w", pkg, err)
+			return nil, errors.NewValidationError("invalid package name", err).WithDetail("package", pkg)
 		}
 
 		if seen[pkg] {
-			return nil, fmt.Errorf("duplicate package name: %s", pkg)
+			return nil, errors.NewValidationError("duplicate package name", nil).WithDetail("package", pkg)
 		}
 
 		seen[pkg] = true
@@ -85,7 +86,7 @@ func SanitizePackageList(packages []string) ([]string, error) {
 	}
 
 	if len(sanitized) == 0 {
-		return nil, fmt.Errorf("no valid packages specified")
+		return nil, errors.NewValidationError("no valid packages specified", nil)
 	}
 
 	return sanitized, nil

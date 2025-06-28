@@ -17,33 +17,51 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Script to install Python, pip, gunicorn and venv on azureuser
+# Script to install Python, pip, gunicorn and venv
 # Exit immediately if a command exits with a non-zero status
-set -e
+set -euo pipefail
 
-# Check if running as root or with sudo
-if [ "$EUID" -ne 0 ]; then
-  echo "This script must be run as root or with sudo"
-  exit 1
-fi
+# Set non-interactive mode
+export DEBIAN_FRONTEND=noninteractive
 
-# Update package lists
-apt-get update
+# Function to retry commands
+retry() {
+  local n=0
+  until [ $n -ge 5 ]; do
+    "$@" && break
+    n=$((n+1))
+    echo "Command failed, retrying... ($n/5)"
+    sleep 2
+  done
+}
+
+# Update package lists with retry
+echo "Updating package lists..."
+retry sudo apt-get update -qq
 
 # Install Python and development tools
-apt-get install -y python"$version" python"$version"-pip python"$version"-dev python"$version"-venv python"$version"-full
+echo "Installing Python $version and development tools..."
+retry sudo apt-get install -y -qq \
+  python"$version" \
+  python"$version"-pip \
+  python"$version"-dev \
+  python"$version"-venv \
+  python"$version"-full \
+  -o Dpkg::Options::="--force-confdef" \
+  -o Dpkg::Options::="--force-confold"
 
 # Install gunicorn via apt instead of pip
-apt-get install -y gunicorn
+echo "Installing gunicorn..."
+retry sudo apt-get install -y -qq gunicorn
 
 # Create symbolic link for python command
 if ! command -v python &> /dev/null; then
-  ln -sf /usr/bin/python3 /usr/local/bin/python
+  sudo ln -sf /usr/bin/python3 /usr/local/bin/python
 fi
 
 # Create log directories
-mkdir -p /var/log/django
-mkdir -p /var/log/celery
+sudo mkdir -p /var/log/django
+sudo mkdir -p /var/log/celery
 
 # Get the current user (who invoked sudo) instead of hardcoded azureuser
 CURRENT_USER=${SUDO_USER:-$(who am i | awk '{print $1}')}
@@ -52,10 +70,10 @@ if [ -z "$CURRENT_USER" ]; then
 fi
 
 # Set permissions using current user
-chown -R "$CURRENT_USER:$CURRENT_USER" /var/log/django
-chown -R "$CURRENT_USER:$CURRENT_USER" /var/log/celery
-chmod 755 /var/log/django
-chmod 755 /var/log/celery
+sudo chown -R "$CURRENT_USER:$CURRENT_USER" /var/log/django
+sudo chown -R "$CURRENT_USER:$CURRENT_USER" /var/log/celery
+sudo chmod 755 /var/log/django
+sudo chmod 755 /var/log/celery
 
 # Print status
 echo "Log directories created and permissions set for user: $CURRENT_USER"

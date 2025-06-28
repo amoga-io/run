@@ -121,12 +121,12 @@ func testRemovalSimulation(t *testing.T, manager *Manager) {
 		Commands: []string{"ls"}, // ls should exist on most systems
 	}
 
-	if !manager.isPackageInstalled(pkg) {
+	if !manager.IsPackageInstalled(pkg) {
 		t.Fatal("ls command should be available")
 	}
 
 	// Test system version detection
-	version := manager.getSystemVersion("python")
+	version := manager.GetSystemVersion("python")
 	_ = version // Use version to avoid unused variable warning
 }
 

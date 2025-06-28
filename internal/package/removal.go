@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/amoga-io/run/internal/logger"
+	"github.com/amoga-io/run/internal/system"
 )
 
 // InstallationType represents how a package is installed
@@ -152,6 +153,34 @@ func (m *Manager) detectInstallationType(packageName string) (InstallationType, 
 
 // isInstalledViaAPT checks if package is installed via APT
 func (m *Manager) isInstalledViaAPT(packageName string) bool {
+	// Special handling for docker
+	if packageName == "docker" {
+		// Check if docker command exists
+		if !system.CommandExists("docker") {
+			return false
+		}
+
+		// Check if it's installed via apt
+		cmd := exec.Command("dpkg", "-l", "docker-ce")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+
+		// Check docker.io package
+		cmd = exec.Command("dpkg", "-l", "docker.io")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+
+		// Check docker-ce-cli package
+		cmd = exec.Command("dpkg", "-l", "docker-ce-cli")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+
+		return false
+	}
+
 	// Check dpkg -l
 	cmd := exec.Command("dpkg", "-l", packageName)
 	if err := cmd.Run(); err == nil {

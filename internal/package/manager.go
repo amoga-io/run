@@ -138,7 +138,7 @@ func (m *Manager) handleDependencyError(err error, rollbackPoint *RollbackPoint)
 func (m *Manager) checkPackageVersion(pkg Package, targetVersion string) (bool, string, error) {
 	// If no version specified, just check if package is installed
 	if targetVersion == "" {
-		if m.isPackageInstalled(pkg) {
+		if m.IsPackageInstalled(pkg) {
 			return true, "already installed", nil
 		}
 		return false, "", nil
@@ -147,14 +147,14 @@ func (m *Manager) checkPackageVersion(pkg Package, targetVersion string) (bool, 
 	// Check if package supports version selection
 	if !pkg.VersionSupport {
 		// For packages without version support, just check if installed
-		if m.isPackageInstalled(pkg) {
+		if m.IsPackageInstalled(pkg) {
 			return true, "already installed", nil
 		}
 		return false, "", nil
 	}
 
 	// Get current system version
-	currentVersion := m.getSystemVersion(pkg.Name)
+	currentVersion := m.GetSystemVersion(pkg.Name)
 	if currentVersion == "" {
 		// Package not installed
 		return false, "", nil
@@ -184,7 +184,7 @@ func (m *Manager) handleExistingInstallation(pkg Package, targetVersion string) 
 		}
 	}
 
-	if m.isPackageInstalled(pkg) {
+	if m.IsPackageInstalled(pkg) {
 		fmt.Printf("Package %s is already installed with a different version. Please remove it first using the CLI remove command.\n", pkg.Name)
 		return false, fmt.Errorf("package %s is already installed with a different version", pkg.Name)
 	}
@@ -278,7 +278,7 @@ func (m *Manager) provideSuggestions(pkg Package) {
 		return
 	}
 
-	isEssentialsInstalled := m.isPackageInstalled(essentialsPkg)
+	isEssentialsInstalled := m.IsPackageInstalled(essentialsPkg)
 
 	// Suggest essentials for development packages
 	if pkg.Category == "development" && !isEssentialsInstalled {
@@ -310,7 +310,7 @@ func (m *Manager) provideSuggestions(pkg Package) {
 		var availableSuggestions []string
 		for _, suggestion := range suggestions {
 			if _, exists := GetPackage(suggestion); exists {
-				if !m.isPackageInstalled(Package{Name: suggestion}) {
+				if !m.IsPackageInstalled(Package{Name: suggestion}) {
 					availableSuggestions = append(availableSuggestions, suggestion)
 				}
 			}
@@ -336,7 +336,7 @@ func (m *Manager) installDependencies(pkg Package) error {
 	for _, dep := range pkg.Dependencies {
 		// Check if dependency is a package in our registry
 		if depPkg, exists := GetPackage(dep); exists {
-			if !m.isPackageInstalled(depPkg) {
+			if !m.IsPackageInstalled(depPkg) {
 				fmt.Printf("Required package %s is not installed\n", dep)
 				// Recursively install package dependencies
 				if err := m.InstallPackage(dep); err != nil {
@@ -363,8 +363,8 @@ func (m *Manager) installDependencies(pkg Package) error {
 	return nil
 }
 
-// isPackageInstalled checks if a package is installed by checking its commands
-func (m *Manager) isPackageInstalled(pkg Package) bool {
+// IsPackageInstalled checks if a package is installed by checking its commands
+func (m *Manager) IsPackageInstalled(pkg Package) bool {
 	for _, cmd := range pkg.Commands {
 		if !system.CommandExists(cmd) {
 			return false
@@ -411,11 +411,18 @@ func (m *Manager) executeInstallScript(pkg Package) error {
 	log.Info("Executing installation script: %s", resolvedScriptPath)
 	fmt.Printf("Executing installation script for %s...\n", pkg.Name)
 
-	// Execute script
+	// Execute script with enhanced environment
 	cmd := exec.Command(resolvedScriptPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = m.repoPath
+
+	// Set enhanced environment variables for non-interactive operation
+	cmd.Env = append(os.Environ(),
+		"DEBIAN_FRONTEND=noninteractive",
+		"APT_LISTCHANGES_FRONTEND=none",
+		"NEEDRESTART_MODE=a",
+	)
 
 	if err := cmd.Run(); err != nil {
 		log.Error("Installation script failed %s: %v", resolvedScriptPath, err)
@@ -486,8 +493,8 @@ func (m *Manager) RemovePackage(packageName string) error {
 	return fmt.Errorf("RemovePackage is deprecated. Use SafeRemovePackage instead")
 }
 
-// getSystemVersion gets the system-installed version of a package
-func (m *Manager) getSystemVersion(packageName string) string {
+// GetSystemVersion gets the system-installed version of a package
+func (m *Manager) GetSystemVersion(packageName string) string {
 	// Use the centralized version manager utility
 	return GetSystemVersion(packageName)
 }

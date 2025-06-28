@@ -54,7 +54,7 @@ func TestIsPackageInstalled(t *testing.T) {
 		Commands: []string{"ls"}, // ls should exist on most systems
 	}
 
-	if !manager.isPackageInstalled(pkg) {
+	if !manager.IsPackageInstalled(pkg) {
 		t.Fatal("ls command should be available")
 	}
 
@@ -64,7 +64,7 @@ func TestIsPackageInstalled(t *testing.T) {
 		Commands: []string{"nonexistentcommand12345"},
 	}
 
-	if manager.isPackageInstalled(pkg) {
+	if manager.IsPackageInstalled(pkg) {
 		t.Fatal("nonexistent command should not be available")
 	}
 }
@@ -76,7 +76,7 @@ func TestGetSystemVersion(t *testing.T) {
 	}
 
 	// Test with a package that might have a version
-	version := manager.getSystemVersion("python")
+	version := manager.GetSystemVersion("python")
 	// Version might be empty if python is not installed, which is fine
 	_ = version // Use version to avoid unused variable warning
 }

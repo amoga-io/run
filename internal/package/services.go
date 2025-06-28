@@ -66,7 +66,7 @@ func (dm *DependencyManager) CheckDependencies(pkg Package) ([]string, error) {
 	for _, dep := range pkg.Dependencies {
 		// Check if dependency is a package in our registry
 		if depPkg, exists := GetPackage(dep); exists {
-			if !dm.manager.isPackageInstalled(depPkg) {
+			if !dm.manager.IsPackageInstalled(depPkg) {
 				missingPackages = append(missingPackages, dep)
 			}
 		} else {
@@ -210,12 +210,12 @@ func NewPackageChecker(manager *Manager) *PackageChecker {
 
 // IsPackageInstalled checks if a package is installed
 func (pc *PackageChecker) IsPackageInstalled(pkg Package) bool {
-	return pc.manager.isPackageInstalled(pkg)
+	return pc.manager.IsPackageInstalled(pkg)
 }
 
 // GetSystemVersion gets the system version of a package
 func (pc *PackageChecker) GetSystemVersion(packageName string) string {
-	return pc.manager.getSystemVersion(packageName)
+	return pc.manager.GetSystemVersion(packageName)
 }
 
 // SuggestionProvider handles package suggestions

@@ -23,16 +23,31 @@ if [ -z "$java_version" ]; then
   java_version="$DEFAULT_VERSION"
 fi
 
+# Set non-interactive mode
+export DEBIAN_FRONTEND=noninteractive
+
+# Function to retry commands
+retry() {
+  local n=0
+  until [ $n -ge 5 ]; do
+    "$@" && break
+    n=$((n+1))
+    echo "Command failed, retrying... ($n/5)"
+    sleep 2
+  done
+}
+
 # Install the selected Java version
+echo "Installing Java $java_version..."
 case "$java_version" in
   11)
-    sudo apt install -y openjdk-11-jdk
+    retry sudo apt install -y -qq openjdk-11-jdk
     ;;
   17)
-    sudo apt install -y openjdk-17-jdk
+    retry sudo apt install -y -qq openjdk-17-jdk
     ;;
   21)
-    sudo apt install -y openjdk-21-jdk
+    retry sudo apt install -y -qq openjdk-21-jdk
     ;;
   *)
     echo "Invalid selection. Please choose 11, 17, or 21."
@@ -41,9 +56,16 @@ case "$java_version" in
 esac
 
 # Set the default Java version automatically
-JAVA_PATH=$(update-alternatives --list java | grep "$java_version" | head -n1)
+echo "Configuring Java alternatives..."
+JAVA_PATH=$(sudo update-alternatives --list java | grep "$java_version" | head -n1)
 if [ -n "$JAVA_PATH" ]; then
-  sudo update-alternatives --set java "$JAVA_PATH"
+  echo "$JAVA_PATH" | sudo update-alternatives --set java /dev/stdin
+fi
+
+# Also set javac
+JAVAC_PATH=$(sudo update-alternatives --list javac | grep "$java_version" | head -n1)
+if [ -n "$JAVAC_PATH" ]; then
+  echo "$JAVAC_PATH" | sudo update-alternatives --set javac /dev/stdin
 fi
 
 echo "Java $java_version installation and setup complete!"

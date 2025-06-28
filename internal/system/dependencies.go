@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/amoga-io/run/internal/logger"
 )
@@ -99,6 +100,49 @@ func validateSudoAccess() error {
 	return nil
 }
 
+// waitForAptLocks waits for APT locks to be released
+func waitForAptLocks() error {
+	timeout := 60 * time.Second
+	interval := 2 * time.Second
+	elapsed := time.Duration(0)
+
+	log := logger.GetLogger().WithOperation("wait_for_apt_locks")
+
+	for elapsed < timeout {
+		// Check if apt is running
+		cmd := exec.Command("pgrep", "-f", "apt")
+		if err := cmd.Run(); err != nil {
+			// No apt process running, we can proceed
+			log.Info("APT locks cleared")
+			return nil
+		}
+
+		log.Info("Waiting for apt locks to clear... (%v/%v)", elapsed, timeout)
+		time.Sleep(interval)
+		elapsed += interval
+	}
+
+	return fmt.Errorf("timeout waiting for apt locks to clear")
+}
+
+// retryCommand retries a command with exponential backoff
+func retryCommand(cmd *exec.Cmd, maxRetries int) error {
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		if err := cmd.Run(); err == nil {
+			return nil
+		} else {
+			lastErr = err
+			if i < maxRetries-1 {
+				time.Sleep(time.Duration(i+1) * time.Second)
+			}
+		}
+	}
+
+	return fmt.Errorf("command failed after %d retries: %w", maxRetries, lastErr)
+}
+
 // InstallSystemPackages installs system packages via apt (silent)
 func InstallSystemPackages(packages []string) error {
 	if len(packages) == 0 {
@@ -108,6 +152,11 @@ func InstallSystemPackages(packages []string) error {
 	// Acquire global lock to prevent concurrent apt operations
 	systemPackageMutex.Lock()
 	defer systemPackageMutex.Unlock()
+
+	// Wait for any existing apt processes to finish
+	if err := waitForAptLocks(); err != nil {
+		return fmt.Errorf("apt lock timeout: %w", err)
+	}
 
 	// Validate sudo access before proceeding
 	if err := validateSudoAccess(); err != nil {
@@ -120,17 +169,22 @@ func InstallSystemPackages(packages []string) error {
 	// Update package list silently
 	updateCmd := exec.Command("sudo", "apt-get", "update", "-qq")
 	updateCmd.Env = append(updateCmd.Env, "DEBIAN_FRONTEND=noninteractive")
-	if err := updateCmd.Run(); err != nil {
+	if err := retryCommand(updateCmd, 3); err != nil {
 		log.Error("Failed to update package list: %v", err)
 		return fmt.Errorf("failed to update package list: %w", err)
 	}
 
-	// Install packages silently
-	args := append([]string{"apt-get", "install", "-y", "-qq", "--no-install-recommends"}, packages...)
+	// Install packages silently with enhanced options
+	args := append([]string{
+		"apt-get", "install", "-y", "-qq", "--no-install-recommends",
+		"-o", "Dpkg::Options::=--force-confdef",
+		"-o", "Dpkg::Options::=--force-confold",
+	}, packages...)
+
 	installCmd := exec.Command("sudo", args...)
 	installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
 
-	if err := installCmd.Run(); err != nil {
+	if err := retryCommand(installCmd, 3); err != nil {
 		log.Error("Failed to install packages %v: %v", packages, err)
 		return fmt.Errorf("failed to install packages %v: %w", packages, err)
 	}
@@ -206,6 +260,11 @@ func InstallDependencies(missing []Dependency) error {
 	systemPackageMutex.Lock()
 	defer systemPackageMutex.Unlock()
 
+	// Wait for any existing apt processes to finish
+	if err := waitForAptLocks(); err != nil {
+		return fmt.Errorf("apt lock timeout: %w", err)
+	}
+
 	// Validate sudo access before proceeding
 	if err := validateSudoAccess(); err != nil {
 		return fmt.Errorf("sudo validation failed: %w", err)
@@ -216,8 +275,9 @@ func InstallDependencies(missing []Dependency) error {
 	fmt.Println("Installing missing dependencies...")
 
 	// Update package list first
-	updateCmd := exec.Command("sudo", "apt", "update")
-	if err := updateCmd.Run(); err != nil {
+	updateCmd := exec.Command("sudo", "apt", "update", "-qq")
+	updateCmd.Env = append(updateCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+	if err := retryCommand(updateCmd, 3); err != nil {
 		log.Error("Failed to update package list: %v", err)
 		return fmt.Errorf("failed to update package list: %w", err)
 	}
@@ -227,8 +287,9 @@ func InstallDependencies(missing []Dependency) error {
 		log.Info("Installing dependency %s (%s)", dep.Command, dep.Package)
 		fmt.Printf("Installing %s (%s)...\n", dep.Description, dep.Package)
 
-		installCmd := exec.Command("sudo", "apt", "install", "-y", dep.Package)
-		if err := installCmd.Run(); err != nil {
+		installCmd := exec.Command("sudo", "apt", "install", "-y", "-qq", dep.Package)
+		installCmd.Env = append(installCmd.Env, "DEBIAN_FRONTEND=noninteractive")
+		if err := retryCommand(installCmd, 3); err != nil {
 			log.Error("Failed to install dependency %s (%s): %v", dep.Command, dep.Package, err)
 			return fmt.Errorf("failed to install %s: %w", dep.Package, err)
 		}

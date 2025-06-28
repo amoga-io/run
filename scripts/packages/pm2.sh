@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Detect the user to set up PM2
 if [ "$SUDO_USER" ]; then
   TARGET_USER="$SUDO_USER"

@@ -38,6 +38,22 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return showPackageListAndPrompt("install")
 	}
 
+	// Validate and sanitize input
+	if !installAll {
+		sanitizedArgs, err := pkg.SanitizePackageList(args)
+		if err != nil {
+			return fmt.Errorf("input validation failed: %w", err)
+		}
+		args = sanitizedArgs
+	}
+
+	// Validate version flag if provided
+	if javaVersion != "" {
+		if err := pkg.ValidateVersionString(javaVersion); err != nil {
+			return fmt.Errorf("invalid version: %w", err)
+		}
+	}
+
 	manager, err := pkg.NewManager()
 	if err != nil {
 		return err
@@ -88,9 +104,9 @@ func installPackagesParallel(manager *pkg.Manager, packages []string) []PackageR
 		wg.Add(1)
 		go func(pkgName string) {
 			defer wg.Done()
-			
+
 			fmt.Printf("Installing %s...\n", pkgName)
-			
+
 			var err error
 			// If installing java and --version is set, pass it to the script
 			if pkgName == "java" && javaVersion != "" {
@@ -172,7 +188,7 @@ func showInstallSummary(results []PackageResult) {
 // showPackageListAndPrompt displays available packages and prompts user to rerun command
 func showPackageListAndPrompt(action string) error {
 	fmt.Printf("No packages specified.\n\n")
-	
+
 	// Show concise package list
 	fmt.Println("Available:")
 	fmt.Println("• node        Node.js + npm")
@@ -194,7 +210,7 @@ func showPackageListAndPrompt(action string) error {
 	fmt.Printf("run %s --all\n", action)
 	fmt.Println()
 	fmt.Printf("Run run %s list to see all.\n", action)
-	
+
 	return fmt.Errorf("please specify packages to %s", action)
 }
 

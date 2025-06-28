@@ -29,6 +29,15 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return showPackageListAndPrompt("remove")
 	}
 
+	// Validate and sanitize input
+	if !removeAll {
+		sanitizedArgs, err := pkg.SanitizePackageList(args)
+		if err != nil {
+			return fmt.Errorf("input validation failed: %w", err)
+		}
+		args = sanitizedArgs
+	}
+
 	manager, err := pkg.NewManager()
 	if err != nil {
 		return err
@@ -72,9 +81,9 @@ func removePackagesParallel(manager *pkg.Manager, packages []string) []PackageRe
 		wg.Add(1)
 		go func(pkgName string) {
 			defer wg.Done()
-			
+
 			fmt.Printf("Removing %s...\n", pkgName)
-			
+
 			err := manager.RemovePackage(pkgName)
 
 			result := PackageResult{

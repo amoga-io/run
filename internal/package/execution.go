@@ -9,7 +9,9 @@ import (
 type PackageResult struct {
 	Name    string
 	Success bool
+	Skipped bool
 	Error   error
+	Message string
 }
 
 // PackageOperation represents a function that operates on a package
@@ -31,7 +33,9 @@ func ExecutePackagesSequential(
 			result := PackageResult{
 				Name:    packageName,
 				Success: false,
+				Skipped: false,
 				Error:   fmt.Errorf("failed to acquire lock: %w", err),
+				Message: "failed to acquire lock",
 			}
 			allResults = append(allResults, result)
 			fmt.Printf("✗ %s failed to acquire lock: %v\n", packageName, err)
@@ -43,10 +47,25 @@ func ExecutePackagesSequential(
 
 		err := operation(packageName)
 
+		// Check if this was a skip (package already installed with same version)
+		if IsPackageAlreadyInstalledError(err) {
+			result := PackageResult{
+				Name:    packageName,
+				Success: true,
+				Skipped: true,
+				Error:   nil,
+				Message: err.Error(),
+			}
+			allResults = append(allResults, result)
+			continue
+		}
+
 		result := PackageResult{
 			Name:    packageName,
 			Success: err == nil,
+			Skipped: false,
 			Error:   err,
+			Message: "",
 		}
 
 		if result.Success {
@@ -67,10 +86,12 @@ func ShowOperationSummary(
 	operationName string,
 	retryCommand string,
 ) {
-	var successful, failed []string
+	var successful, failed, skipped []string
 
 	for _, result := range results {
-		if result.Success {
+		if result.Skipped {
+			skipped = append(skipped, result.Name)
+		} else if result.Success {
 			successful = append(successful, result.Name)
 		} else {
 			failed = append(failed, result.Name)
@@ -85,11 +106,15 @@ func ShowOperationSummary(
 		fmt.Printf("✓ Successfully %s (%d): %s\n", operationName, len(successful), strings.Join(successful, ", "))
 	}
 
+	if len(skipped) > 0 {
+		fmt.Printf("⏭️  Skipped - already installed (%d): %s\n", len(skipped), strings.Join(skipped, ", "))
+	}
+
 	if len(failed) > 0 {
 		fmt.Printf("✗ Failed to %s (%d): %s\n", operationName, len(failed), strings.Join(failed, ", "))
 		fmt.Println("\nFailed packages details:")
 		for _, result := range results {
-			if !result.Success {
+			if !result.Success && !result.Skipped {
 				fmt.Printf("  • %s: %v\n", result.Name, result.Error)
 			}
 		}
@@ -98,7 +123,8 @@ func ShowOperationSummary(
 	total := len(results)
 	if total > 0 {
 		fmt.Printf("\nTotal: %d packages processed\n", total)
-		fmt.Printf("Success rate: %.1f%% (%d/%d)\n", float64(len(successful))/float64(total)*100, len(successful), total)
+		successRate := float64(len(successful)+len(skipped)) / float64(total) * 100
+		fmt.Printf("Success rate: %.1f%% (%d/%d)\n", successRate, len(successful)+len(skipped), total)
 
 		if len(failed) > 0 {
 			fmt.Printf("\nTo retry failed packages: %s %s\n", retryCommand, strings.Join(failed, " "))

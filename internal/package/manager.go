@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/amoga-io/run/internal/logger"
@@ -13,6 +12,25 @@ import (
 
 type Manager struct {
 	repoPath string
+}
+
+// PackageAlreadyInstalledError represents when a package is already installed with the same version
+type PackageAlreadyInstalledError struct {
+	PackageName string
+	Version     string
+}
+
+func (e *PackageAlreadyInstalledError) Error() string {
+	if e.Version != "" {
+		return fmt.Sprintf("package %s already installed with version %s", e.PackageName, e.Version)
+	}
+	return fmt.Sprintf("package %s already installed", e.PackageName)
+}
+
+// IsPackageAlreadyInstalledError checks if an error is a PackageAlreadyInstalledError
+func IsPackageAlreadyInstalledError(err error) bool {
+	_, ok := err.(*PackageAlreadyInstalledError)
+	return ok
 }
 
 func NewManager() (*Manager, error) {
@@ -38,8 +56,13 @@ func NewManager() (*Manager, error) {
 	return &Manager{repoPath: resolvedPath}, nil
 }
 
-// InstallPackage installs a package with dependency checking and rollback support
+// InstallPackage installs a package
 func (m *Manager) InstallPackage(packageName string) error {
+	return m.InstallPackageWithVersion(packageName, "")
+}
+
+// InstallPackageWithVersion installs a package with a specific version
+func (m *Manager) InstallPackageWithVersion(packageName string, targetVersion string) error {
 	pkg, err := m.validatePackage(packageName)
 	if err != nil {
 		return err
@@ -55,8 +78,13 @@ func (m *Manager) InstallPackage(packageName string) error {
 		return m.handleDependencyError(err, rollbackPoint)
 	}
 
-	if err := m.handleExistingInstallation(pkg, packageName, rollbackPoint); err != nil {
+	// Check if package is already installed with same version
+	skipInstallation, err := m.handleExistingInstallation(pkg, targetVersion)
+	if err != nil {
 		return err
+	}
+	if skipInstallation {
+		return nil // Package already installed with same version
 	}
 
 	return m.executeInstallation(pkg, rollbackPoint)
@@ -106,18 +134,62 @@ func (m *Manager) handleDependencyError(err error, rollbackPoint *RollbackPoint)
 	return fmt.Errorf("failed to install dependencies: %w", err)
 }
 
-// handleExistingInstallation handles existing package installation
-func (m *Manager) handleExistingInstallation(pkg Package, packageName string, rollbackPoint *RollbackPoint) error {
-	if m.isPackageInstalled(pkg) {
-		fmt.Printf("Package %s is already installed, removing first...\n", pkg.Name)
-		if err := m.RemovePackage(packageName); err != nil {
-			if rollbackPoint != nil {
-				rollbackPoint.ExecuteRollback()
-			}
-			return fmt.Errorf("failed to remove existing package: %w", err)
+// checkPackageVersion checks if a package is already installed with the same version
+func (m *Manager) checkPackageVersion(pkg Package, targetVersion string) (bool, string, error) {
+	// If no version specified, just check if package is installed
+	if targetVersion == "" {
+		if m.isPackageInstalled(pkg) {
+			return true, "already installed", nil
+		}
+		return false, "", nil
+	}
+
+	// Check if package supports version selection
+	if !pkg.VersionSupport {
+		// For packages without version support, just check if installed
+		if m.isPackageInstalled(pkg) {
+			return true, "already installed", nil
+		}
+		return false, "", nil
+	}
+
+	// Get current system version
+	currentVersion := m.getSystemVersion(pkg.Name)
+	if currentVersion == "" {
+		// Package not installed
+		return false, "", nil
+	}
+
+	// Compare versions
+	if currentVersion == targetVersion {
+		return true, fmt.Sprintf("already installed (version %s)", currentVersion), nil
+	}
+
+	// Different version installed
+	return false, fmt.Sprintf("different version installed (current: %s, target: %s)", currentVersion, targetVersion), nil
+}
+
+// handleExistingInstallation handles existing package installation with version checking
+func (m *Manager) handleExistingInstallation(pkg Package, targetVersion string) (bool, error) {
+	isSameVersion, message, err := m.checkPackageVersion(pkg, targetVersion)
+	if err != nil {
+		return false, err
+	}
+
+	if isSameVersion {
+		fmt.Printf("✓ %s %s - skipping installation\n", pkg.Name, message)
+		return true, &PackageAlreadyInstalledError{
+			PackageName: pkg.Name,
+			Version:     targetVersion,
 		}
 	}
-	return nil
+
+	if m.isPackageInstalled(pkg) {
+		fmt.Printf("Package %s is already installed with a different version. Please remove it first using the CLI remove command.\n", pkg.Name)
+		return false, fmt.Errorf("package %s is already installed with a different version", pkg.Name)
+	}
+
+	return false, nil // Proceed with installation
 }
 
 // executeInstallation executes the actual installation
@@ -139,6 +211,12 @@ func (m *Manager) InstallPackageWithArgs(packageName string, extraArgs []string)
 	}
 
 	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
+
+	// Extract version from extraArgs if present
+	targetVersion := ""
+	if len(extraArgs) >= 2 && extraArgs[0] == "--version" {
+		targetVersion = extraArgs[1]
+	}
 
 	// Create rollback manager
 	rollbackManager, err := NewRollbackManager()
@@ -174,14 +252,13 @@ func (m *Manager) InstallPackageWithArgs(packageName string, extraArgs []string)
 		return fmt.Errorf("failed to install dependencies: %w", err)
 	}
 
-	// Step 2: Check if package is already installed, remove if so
-	if m.isPackageInstalled(pkg) {
-		fmt.Printf("Package %s is already installed, removing first...\n", pkg.Name)
-		if err := m.RemovePackage(packageName); err != nil {
-			// Execute rollback on removal failure
-			rollbackPoint.ExecuteRollback()
-			return fmt.Errorf("failed to remove existing package: %w", err)
-		}
+	// Step 2: Check if package is already installed with same version
+	skipInstallation, err := m.handleExistingInstallation(pkg, targetVersion)
+	if err != nil {
+		return err
+	}
+	if skipInstallation {
+		return nil // Package already installed with same version
 	}
 
 	// Step 3: Execute installation script with extra arguments
@@ -404,309 +481,13 @@ func (m *Manager) executeInstallScriptWithArgs(pkg Package, extraArgs []string) 
 	return nil
 }
 
-// RemovePackage removes a package completely (Go-based removal)
+// RemovePackage is deprecated. Use SafeRemovePackage instead.
 func (m *Manager) RemovePackage(packageName string) error {
-	pkg, exists := GetPackage(packageName)
-	if !exists {
-		return fmt.Errorf("package '%s' not found", packageName)
-	}
-
-	fmt.Printf("Removing %s completely...\n", pkg.Name)
-
-	// Check if package is actually installed via CLI before attempting removal
-	if !m.isPackageInstalled(pkg) {
-		fmt.Printf("Package %s is not detected via CLI commands, attempting user-level removal...\n", pkg.Name)
-	}
-
-	switch packageName {
-	case "python":
-		return m.removePython()
-	case "node":
-		return m.removeNode()
-	case "php":
-		return m.removePHP()
-	case "essentials":
-		return m.removeEssentials()
-	case "docker":
-		return m.removeDocker()
-	case "nginx":
-		return m.removeNginx()
-	case "postgres":
-		return m.removePostgres()
-	case "java":
-		return m.removeJava()
-	case "pm2":
-		return m.removePM2()
-	default:
-		return fmt.Errorf("safe removal not implemented for package: %s", packageName)
-	}
+	return fmt.Errorf("RemovePackage is deprecated. Use SafeRemovePackage instead")
 }
 
 // getSystemVersion gets the system-installed version of a package
 func (m *Manager) getSystemVersion(packageName string) string {
-	switch packageName {
-	case "python":
-		if out, err := exec.Command("python3", "--version").Output(); err == nil {
-			parts := strings.Fields(string(out))
-			if len(parts) >= 2 {
-				ver := parts[1]
-				verParts := strings.Split(ver, ".")
-				if len(verParts) >= 2 {
-					return verParts[0] + "." + verParts[1]
-				}
-			}
-		}
-	case "node":
-		if out, err := exec.Command("node", "--version").Output(); err == nil {
-			ver := strings.TrimPrefix(strings.TrimSpace(string(out)), "v")
-			verParts := strings.Split(ver, ".")
-			if len(verParts) >= 2 {
-				return verParts[0]
-			}
-		}
-	case "php":
-		if out, err := exec.Command("php", "-v").Output(); err == nil {
-			parts := strings.Fields(string(out))
-			if len(parts) >= 2 {
-				ver := parts[1]
-				verParts := strings.Split(ver, ".")
-				if len(verParts) >= 2 {
-					return verParts[0] + "." + verParts[1]
-				}
-			}
-		}
-	}
-	return ""
-}
-
-// Only remove user-installed Python versions (never system python3)
-func (m *Manager) removePython() error {
-	fmt.Println("Stopping Python services...")
-
-	systemVersion := m.getSystemVersion("python")
-	userVersions := []string{"3.10", "3.11", "3.12"} // Add more as needed
-	removedAny := false
-
-	for _, v := range userVersions {
-		if v == systemVersion {
-			fmt.Printf("Refusing to remove system Python (%s). This would break your OS.\n", v)
-			continue
-		}
-		// Only remove from /usr/local, never from /usr/bin
-		fmt.Printf("Attempting to remove user-installed Python %s...\n", v)
-		commands := [][]string{
-			{"sudo", "rm", "-rf", "/usr/local/lib/python" + v + "*"},
-			{"sudo", "rm", "-rf", "/usr/local/bin/python" + v + "*"},
-			{"sudo", "rm", "-rf", "/usr/local/bin/pip" + v + "*"},
-		}
-		m.executeRemovalCommands("Python "+v, commands)
-		removedAny = true
-	}
-	if !removedAny {
-		fmt.Println("No user-installed Python versions found to remove.")
-	}
-	return nil
-}
-
-// Only remove user-installed Node.js (never system nodejs)
-func (m *Manager) removeNode() error {
-	systemVersion := m.getSystemVersion("node")
-	userVersions := []string{"18", "20", "21"} // Add more as needed
-	removedAny := false
-
-	for _, v := range userVersions {
-		if v == systemVersion {
-			fmt.Printf("Refusing to remove system Node.js (%s). This would break your OS.\n", v)
-			continue
-		}
-		fmt.Printf("Attempting to remove user-installed Node.js %s...\n", v)
-		commands := [][]string{
-			{"sudo", "rm", "-rf", "/usr/local/lib/node_modules"},
-			{"sudo", "rm", "-rf", "/usr/local/bin/node*"},
-			{"sudo", "rm", "-rf", "/usr/local/bin/npm*"},
-			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".npm")},
-			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".npm-global")},
-			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".node-gyp")},
-			{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".node_repl_history")},
-		}
-		m.executeRemovalCommands("Node.js "+v, commands)
-		removedAny = true
-	}
-	if !removedAny {
-		fmt.Println("No user-installed Node.js versions found to remove.")
-	}
-	return nil
-}
-
-// Only remove user-installed PHP (never system php)
-func (m *Manager) removePHP() error {
-	systemVersion := m.getSystemVersion("php")
-	userVersions := []string{"8.1", "8.2", "8.3"}
-	removedAny := false
-
-	for _, v := range userVersions {
-		if v == systemVersion {
-			fmt.Printf("Refusing to remove system PHP (%s). This would break your OS.\n", v)
-			continue
-		}
-		fmt.Printf("Attempting to remove user-installed PHP %s...\n", v)
-		commands := [][]string{
-			{"sudo", "rm", "-rf", "/usr/local/bin/php" + v + "*"},
-			{"sudo", "rm", "-rf", "/usr/local/lib/php" + v + "*"},
-			{"sudo", "rm", "-rf", "/usr/local/etc/php" + v + "*"},
-			{"sudo", "rm", "-rf", "/usr/local/pear"},
-		}
-		m.executeRemovalCommands("PHP "+v, commands)
-		removedAny = true
-	}
-	if !removedAny {
-		fmt.Println("No user-installed PHP versions found to remove.")
-	}
-	return nil
-}
-
-// Essentials: Only remove user-level tools, never system packages
-func (m *Manager) removeEssentials() error {
-	fmt.Println("Removing user-level system essentials...")
-	commands := [][]string{
-		{"sudo", "rm", "-rf", "/usr/local/bin/redis-server"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/gcc"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/make"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/g++"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/ncdu"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/jq"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/curl"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/wget"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/redis*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/gcc*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/make*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/g++*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/ncdu*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/jq*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/curl*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/wget*"},
-	}
-	return m.executeRemovalCommands("User-level system essentials", commands)
-}
-
-// executeRemovalCommands executes removal commands with proper error handling
-func (m *Manager) executeRemovalCommands(packageName string, commands [][]string) error {
-	log := logger.GetLogger().WithOperation("execute_removal_commands").WithPackage(packageName)
-
-	log.Info("Executing removal commands: %d", len(commands))
-
-	var errors []string
-
-	for i, cmdArgs := range commands {
-		if len(cmdArgs) == 0 {
-			continue
-		}
-
-		log.Info("Executing removal command %d: %v", i, cmdArgs)
-
-		// Handle shell operators like || true
-		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" && cmdArgs[len(cmdArgs)-1] == "true" {
-			// Execute command and ignore errors if || true
-			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
-			if err := cmd.Run(); err != nil {
-				log.Warn("Removal command failed (ignored due to || true): %v - %v", cmdArgs, err)
-			}
-			continue
-		}
-
-		// Handle other shell operators like ||
-		if len(cmdArgs) >= 3 && cmdArgs[len(cmdArgs)-2] == "||" {
-			// Execute main command, if it fails, execute the fallback
-			cmd := exec.Command(cmdArgs[0], cmdArgs[1:len(cmdArgs)-2]...)
-			if err := cmd.Run(); err != nil {
-				log.Warn("Main removal command failed, trying fallback: %v - %v", cmdArgs, err)
-				// Execute fallback command
-				fallbackCmd := exec.Command(cmdArgs[len(cmdArgs)-1])
-				if fallbackErr := fallbackCmd.Run(); fallbackErr != nil {
-					log.Error("Fallback removal command also failed: %v (fallback error: %v)", cmdArgs, fallbackErr)
-					errors = append(errors, fmt.Sprintf("command failed: %v (fallback also failed)", cmdArgs))
-				}
-			}
-			continue
-		}
-
-		// Regular command execution
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		if err := cmd.Run(); err != nil {
-			// Continue with other commands for removal operations but track the error
-			errorMsg := fmt.Sprintf("command failed: %v", cmdArgs)
-			log.Warn("Removal command failed: %v - %v", cmdArgs, err)
-			fmt.Printf("Warning: %s (continuing...)\n", errorMsg)
-			errors = append(errors, errorMsg)
-		}
-	}
-
-	// Return aggregated errors if any occurred
-	if len(errors) > 0 {
-		return fmt.Errorf("some removal commands failed: %s", strings.Join(errors, "; "))
-	}
-
-	log.Info("All removal commands completed")
-	fmt.Printf("✓ %s removed completely\n", packageName)
-	return nil
-}
-
-// Only remove user-level Docker files
-func (m *Manager) removeDocker() error {
-	fmt.Println("Removing user-level Docker files...")
-	commands := [][]string{
-		{"sudo", "rm", "-rf", "/usr/local/bin/docker"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/docker-compose"},
-		{"sudo", "rm", "-rf", "/usr/local/bin/docker*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/docker*"},
-		{"sudo", "rm", "-rf", filepath.Join(os.Getenv("HOME"), ".docker")},
-		{"sudo", "rm", "-rf", "/usr/local/share/docker*"},
-	}
-	return m.executeRemovalCommands("User-level Docker", commands)
-}
-
-// Only remove user-level Nginx files
-func (m *Manager) removeNginx() error {
-	fmt.Println("Removing user-level Nginx files...")
-	commands := [][]string{
-		{"sudo", "rm", "-rf", "/usr/local/bin/nginx"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/nginx*"},
-		{"sudo", "rm", "-rf", "/usr/local/share/nginx*"},
-		{"sudo", "rm", "-rf", filepath.Join(os.Getenv("HOME"), ".nginx")},
-	}
-	return m.executeRemovalCommands("User-level Nginx", commands)
-}
-
-// Only remove user-level Postgres files
-func (m *Manager) removePostgres() error {
-	fmt.Println("Removing user-level Postgres files...")
-	commands := [][]string{
-		{"sudo", "rm", "-rf", "/usr/local/bin/psql"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/postgres*"},
-		{"sudo", "rm", "-rf", "/usr/local/share/postgres*"},
-		{"sudo", "rm", "-rf", filepath.Join(os.Getenv("HOME"), ".psql_history")},
-	}
-	return m.executeRemovalCommands("User-level Postgres", commands)
-}
-
-// Only remove user-level Java files
-func (m *Manager) removeJava() error {
-	fmt.Println("Removing user-level Java files...")
-	commands := [][]string{
-		{"sudo", "rm", "-rf", "/usr/local/bin/java*"},
-		{"sudo", "rm", "-rf", "/usr/local/lib/jvm*"},
-		{"sudo", "rm", "-rf", "/usr/local/share/java*"},
-	}
-	return m.executeRemovalCommands("User-level Java", commands)
-}
-
-// Only remove user-level PM2 files
-func (m *Manager) removePM2() error {
-	fmt.Println("Removing user-level PM2 files...")
-	commands := [][]string{
-		{"pm2", "kill", "||", "true"},
-		{"npm", "uninstall", "-g", "pm2", "||", "true"},
-		{"rm", "-rf", filepath.Join(os.Getenv("HOME"), ".pm2")},
-	}
-	return m.executeRemovalCommands("User-level PM2", commands)
+	// Use the centralized version manager utility
+	return GetSystemVersion(packageName)
 }

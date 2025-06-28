@@ -8,6 +8,8 @@ import (
 )
 
 var removeAll bool
+var forceRemove bool
+var dryRunRemove bool
 
 var removeCmd = &cobra.Command{
 	Use:   "remove [package...]",
@@ -19,6 +21,8 @@ var removeCmd = &cobra.Command{
 
 func init() {
 	removeCmd.Flags().BoolVar(&removeAll, "all", false, "Remove all available packages")
+	removeCmd.Flags().BoolVar(&forceRemove, "force", false, "Force removal of system-critical packages (DANGEROUS)")
+	removeCmd.Flags().BoolVar(&dryRunRemove, "dry-run", false, "Show what would be removed, but do not actually remove anything")
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
@@ -60,16 +64,12 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		packagesToRemove = args
 	}
 
-	// Create removal operation function
-	removeOperation := func(packageName string) error {
-		return manager.RemovePackage(packageName)
+	var results []*pkg.RemovalResult
+	for _, packageName := range packagesToRemove {
+		result, _ := manager.SafeRemovePackage(packageName, forceRemove, dryRunRemove)
+		results = append(results, result)
 	}
 
-	// Remove packages sequentially using generic function
-	results := pkg.ExecutePackagesSequential(manager, packagesToRemove, removeOperation, "Removing")
-
-	// Show summary using generic function
-	pkg.ShowOperationSummary(results, "removed", "run remove")
-
+	pkg.ShowRemovalSummary(results)
 	return nil
 }

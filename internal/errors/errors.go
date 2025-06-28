@@ -5,175 +5,206 @@ import (
 	"strings"
 )
 
-// ErrorType represents the type of error
-type ErrorType string
-
-const (
-	ValidationError   ErrorType = "validation"
-	NotFoundError     ErrorType = "not_found"
-	PermissionError   ErrorType = "permission"
-	NetworkError      ErrorType = "network"
-	InstallationError ErrorType = "installation"
-	RemovalError      ErrorType = "removal"
-	UpdateError       ErrorType = "update"
-	SystemError       ErrorType = "system"
+// Common error types
+var (
+	ErrInvalidPackageName  = fmt.Errorf("invalid package name")
+	ErrPackageNotFound     = fmt.Errorf("package not found")
+	ErrVersionNotSupported = fmt.Errorf("version not supported")
+	ErrInstallationFailed  = fmt.Errorf("installation failed")
+	ErrRemovalFailed       = fmt.Errorf("removal failed")
+	ErrValidationFailed    = fmt.Errorf("validation failed")
+	ErrDependencyFailed    = fmt.Errorf("dependency failed")
 )
 
-// AppError represents a standardized application error
-type AppError struct {
-	Type    ErrorType
-	Message string
-	Details map[string]interface{}
-	Err     error
+// PackageError represents a package-specific error
+type PackageError struct {
+	PackageName string
+	Operation   string
+	Message     string
+	Err         error
 }
 
-// Error implements the error interface
-func (e *AppError) Error() string {
+func (e *PackageError) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("[%s] %s: %v", e.Type, e.Message, e.Err)
+		return fmt.Sprintf("%s %s: %s (%v)", e.Operation, e.PackageName, e.Message, e.Err)
 	}
-	return fmt.Sprintf("[%s] %s", e.Type, e.Message)
+	return fmt.Sprintf("%s %s: %s", e.Operation, e.PackageName, e.Message)
 }
 
-// Unwrap returns the underlying error
-func (e *AppError) Unwrap() error {
+func (e *PackageError) Unwrap() error {
 	return e.Err
 }
 
-// WithDetail adds a detail to the error
-func (e *AppError) WithDetail(key string, value interface{}) *AppError {
-	if e.Details == nil {
-		e.Details = make(map[string]interface{})
+// NewPackageError creates a new package error
+func NewPackageError(packageName, operation, message string, err error) *PackageError {
+	return &PackageError{
+		PackageName: packageName,
+		Operation:   operation,
+		Message:     message,
+		Err:         err,
 	}
-	e.Details[key] = value
-	return e
+}
+
+// ValidationError represents a validation error
+type ValidationError struct {
+	Field   string
+	Value   string
+	Message string
+}
+
+func (e *ValidationError) Error() string {
+	if e.Value != "" {
+		return fmt.Sprintf("validation failed for %s '%s': %s", e.Field, e.Value, e.Message)
+	}
+	return fmt.Sprintf("validation failed for %s: %s", e.Field, e.Message)
 }
 
 // NewValidationError creates a new validation error
-func NewValidationError(message string, err error) *AppError {
-	return &AppError{
-		Type:    ValidationError,
+func NewValidationError(field, value, message string) *ValidationError {
+	return &ValidationError{
+		Field:   field,
+		Value:   value,
 		Message: message,
-		Err:     err,
 	}
 }
 
-// NewNotFoundError creates a new not found error
-func NewNotFoundError(resource string, name string) *AppError {
-	return &AppError{
-		Type:    NotFoundError,
-		Message: fmt.Sprintf("%s '%s' not found", resource, name),
-		Details: map[string]interface{}{
-			"resource": resource,
-			"name":     name,
-		},
+// VersionError represents a version-related error
+type VersionError struct {
+	PackageName string
+	Version     string
+	Message     string
+}
+
+func (e *VersionError) Error() string {
+	if e.Version != "" {
+		return fmt.Sprintf("version error for %s %s: %s", e.PackageName, e.Version, e.Message)
+	}
+	return fmt.Sprintf("version error for %s: %s", e.PackageName, e.Message)
+}
+
+// NewVersionError creates a new version error
+func NewVersionError(packageName, version, message string) *VersionError {
+	return &VersionError{
+		PackageName: packageName,
+		Version:     version,
+		Message:     message,
 	}
 }
 
-// NewPermissionError creates a new permission error
-func NewPermissionError(operation string, resource string) *AppError {
-	return &AppError{
-		Type:    PermissionError,
-		Message: fmt.Sprintf("insufficient permissions to %s %s", operation, resource),
-		Details: map[string]interface{}{
-			"operation": operation,
-			"resource":  resource,
-		},
+// DependencyError represents a dependency-related error
+type DependencyError struct {
+	PackageName string
+	Dependency  string
+	Message     string
+	Err         error
+}
+
+func (e *DependencyError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("dependency error for %s (requires %s): %s (%v)", e.PackageName, e.Dependency, e.Message, e.Err)
+	}
+	return fmt.Sprintf("dependency error for %s (requires %s): %s", e.PackageName, e.Dependency, e.Message)
+}
+
+func (e *DependencyError) Unwrap() error {
+	return e.Err
+}
+
+// NewDependencyError creates a new dependency error
+func NewDependencyError(packageName, dependency, message string, err error) *DependencyError {
+	return &DependencyError{
+		PackageName: packageName,
+		Dependency:  dependency,
+		Message:     message,
+		Err:         err,
 	}
 }
 
-// NewNetworkError creates a new network error
-func NewNetworkError(operation string, url string, err error) *AppError {
-	return &AppError{
-		Type:    NetworkError,
-		Message: fmt.Sprintf("network error during %s", operation),
-		Details: map[string]interface{}{
-			"operation": operation,
-			"url":       url,
-		},
-		Err: err,
-	}
+// IsValidationError checks if an error is a validation error
+func IsValidationError(err error) bool {
+	_, ok := err.(*ValidationError)
+	return ok
 }
 
-// NewInstallationError creates a new installation error
-func NewInstallationError(packageName string, err error) *AppError {
-	return &AppError{
-		Type:    InstallationError,
-		Message: fmt.Sprintf("failed to install package '%s'", packageName),
-		Details: map[string]interface{}{
-			"package": packageName,
-		},
-		Err: err,
-	}
+// IsVersionError checks if an error is a version error
+func IsVersionError(err error) bool {
+	_, ok := err.(*VersionError)
+	return ok
 }
 
-// NewRemovalError creates a new removal error
-func NewRemovalError(packageName string, err error) *AppError {
-	return &AppError{
-		Type:    RemovalError,
-		Message: fmt.Sprintf("failed to remove package '%s'", packageName),
-		Details: map[string]interface{}{
-			"package": packageName,
-		},
-		Err: err,
-	}
+// IsPackageError checks if an error is a package error
+func IsPackageError(err error) bool {
+	_, ok := err.(*PackageError)
+	return ok
 }
 
-// NewUpdateError creates a new update error
-func NewUpdateError(component string, err error) *AppError {
-	return &AppError{
-		Type:    UpdateError,
-		Message: fmt.Sprintf("failed to update %s", component),
-		Details: map[string]interface{}{
-			"component": component,
-		},
-		Err: err,
-	}
-}
-
-// NewSystemError creates a new system error
-func NewSystemError(operation string, err error) *AppError {
-	return &AppError{
-		Type:    SystemError,
-		Message: fmt.Sprintf("system error during %s", operation),
-		Details: map[string]interface{}{
-			"operation": operation,
-		},
-		Err: err,
-	}
+// IsDependencyError checks if an error is a dependency error
+func IsDependencyError(err error) bool {
+	_, ok := err.(*DependencyError)
+	return ok
 }
 
 // FormatError formats an error for user display
 func FormatError(err error) string {
-	if appErr, ok := err.(*AppError); ok {
-		// Format AppError with details
-		message := appErr.Message
-		if len(appErr.Details) > 0 {
-			var details []string
-			for key, value := range appErr.Details {
-				details = append(details, fmt.Sprintf("%s=%v", key, value))
-			}
-			message += fmt.Sprintf(" (%s)", strings.Join(details, ", "))
+	if err == nil {
+		return ""
+	}
+
+	// Handle specific error types
+	switch e := err.(type) {
+	case *PackageError:
+		return e.Error()
+	case *ValidationError:
+		return e.Error()
+	case *VersionError:
+		return e.Error()
+	case *DependencyError:
+		return e.Error()
+	default:
+		// For generic errors, clean up common patterns
+		msg := err.Error()
+
+		// Remove trailing punctuation
+		msg = strings.TrimRight(msg, ".")
+
+		// Capitalize first letter
+		if len(msg) > 0 {
+			msg = strings.ToUpper(msg[:1]) + msg[1:]
 		}
-		return message
-	}
 
-	// Format regular errors
-	return err.Error()
+		return msg
+	}
 }
 
-// IsErrorType checks if an error is of a specific type
-func IsErrorType(err error, errorType ErrorType) bool {
-	if appErr, ok := err.(*AppError); ok {
-		return appErr.Type == errorType
+// WrapError wraps an error with additional context
+func WrapError(err error, context string) error {
+	if err == nil {
+		return nil
 	}
-	return false
+	return fmt.Errorf("%s: %w", context, err)
 }
 
-// GetErrorDetails returns the details of an AppError
-func GetErrorDetails(err error) map[string]interface{} {
-	if appErr, ok := err.(*AppError); ok {
-		return appErr.Details
+// CombineErrors combines multiple errors into a single error
+func CombineErrors(errors ...error) error {
+	var nonNilErrors []error
+	for _, err := range errors {
+		if err != nil {
+			nonNilErrors = append(nonNilErrors, err)
+		}
 	}
-	return nil
+
+	if len(nonNilErrors) == 0 {
+		return nil
+	}
+
+	if len(nonNilErrors) == 1 {
+		return nonNilErrors[0]
+	}
+
+	var messages []string
+	for _, err := range nonNilErrors {
+		messages = append(messages, err.Error())
+	}
+
+	return fmt.Errorf("multiple errors occurred: %s", strings.Join(messages, "; "))
 }

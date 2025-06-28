@@ -218,7 +218,8 @@ func ValidateDependencies() error {
 	packages := ListPackages()
 	for _, node := range graph.Nodes {
 		for _, dep := range node.Dependencies {
-			if _, exists := packages[dep]; !exists {
+			// Check if dependency is in our registry (system dependencies are fine)
+			if _, found := packages[dep]; !found {
 				// This is a system dependency, which is fine
 				continue
 			}

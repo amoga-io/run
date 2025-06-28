@@ -35,7 +35,7 @@ func TestPackageLifecycle(t *testing.T) {
 
 	// Test dependency checking
 	t.Run("Dependency Checking", func(t *testing.T) {
-		testDependencyChecking(t, suite.manager)
+		testDependencyChecking(t)
 	})
 
 	// Test package installation simulation
@@ -74,7 +74,7 @@ func testPackageValidation(t *testing.T, manager *Manager) {
 }
 
 // testDependencyChecking tests dependency checking functionality
-func testDependencyChecking(t *testing.T, manager *Manager) {
+func testDependencyChecking(t *testing.T) {
 	// Test packages with dependencies
 	pythonPkg, _ := GetPackage("python")
 	if len(pythonPkg.Dependencies) == 0 {
@@ -259,7 +259,7 @@ func TestErrorHandling(t *testing.T) {
 
 	// Test rollback setup errors
 	// This might fail if HOME is not set, which is expected
-	_, err = suite.manager.setupRollback("test")
+	_, _ = suite.manager.setupRollback("test")
 	// We don't check for error here as it might fail in test environment
 
 	// Test dependency error handling

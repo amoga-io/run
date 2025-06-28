@@ -12,6 +12,8 @@ import (
 var (
 	packageVersion string
 	installAll     bool
+	cleanInstall   bool
+	dryRunInstall  bool
 )
 
 var installCmd = &cobra.Command{
@@ -25,6 +27,8 @@ var installCmd = &cobra.Command{
 func init() {
 	installCmd.Flags().StringVar(&packageVersion, "version", "", "Package version to install (e.g., 18 for node, 3.10 for python)")
 	installCmd.Flags().BoolVar(&installAll, "all", false, "Install all available packages")
+	installCmd.Flags().BoolVar(&cleanInstall, "clean", false, "Force clean reinstallation (remove existing first)")
+	installCmd.Flags().BoolVar(&dryRunInstall, "dry-run", false, "Show what would be installed, but do not actually install anything")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
@@ -105,11 +109,41 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Create installation operation function
 	installOperation := func(packageName string) error {
+		// Handle dry-run mode
+		if dryRunInstall {
+			fmt.Printf("🔍 DRY-RUN: Would install %s\n", packageName)
+			if cleanInstall {
+				fmt.Printf("🔍 DRY-RUN: Would remove existing %s first\n", packageName)
+			}
+			if packageVersion != "" && pkg.SupportsVersion(packageName) {
+				fmt.Printf("🔍 DRY-RUN: Would install version %s\n", packageVersion)
+			}
+			return nil // Skip actual installation in dry-run mode
+		}
+
+		// Handle clean installation
+		if cleanInstall {
+			fmt.Printf("🧹 Clean installation requested for %s\n", packageName)
+
+			// Remove existing installation first
+			result, err := manager.SafeRemovePackage(packageName, false, false)
+			if err != nil {
+				log.Error("Failed to remove existing %s for clean install: %v", packageName, err)
+				return fmt.Errorf("clean installation failed - could not remove existing %s: %w", packageName, err)
+			}
+
+			if result.Success {
+				fmt.Printf("✓ Removed existing %s for clean installation\n", packageName)
+			} else if result.Warning != "" {
+				fmt.Printf("⚠️  %s\n", result.Warning)
+			}
+		}
+
 		// Check if package supports version and version flag is provided
 		if pkg.SupportsVersion(packageName) && packageVersion != "" {
 			return manager.InstallPackageWithArgs(packageName, []string{"--version", packageVersion})
 		}
-		return manager.InstallPackage(packageName)
+		return manager.InstallPackageWithVersion(packageName, packageVersion)
 	}
 
 	// Install packages sequentially using generic function
@@ -146,6 +180,9 @@ func showPackageListAndPrompt(action string) error {
 	fmt.Printf("run %s java --version 17\n", action)
 	fmt.Printf("run %s essentials\n", action)
 	fmt.Printf("run %s --all\n", action)
+	if action == "install" {
+		fmt.Printf("run %s node --clean\n", action)
+	}
 	fmt.Println()
 	fmt.Printf("Run run %s list to see all.\n", action)
 

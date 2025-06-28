@@ -206,15 +206,5 @@ func (cm *ConfigManager) RelatedPackages() map[string][]string {
 
 // ConvertToPackage converts PackageConfig to Package
 func (pc PackageConfig) ConvertToPackage() Package {
-	return Package{
-		Name:              pc.Name,
-		Description:       pc.Description,
-		ScriptPath:        pc.ScriptPath,
-		Dependencies:      pc.Dependencies,
-		Commands:          pc.Commands,
-		Category:          pc.Category,
-		VersionSupport:    pc.VersionSupport,
-		DefaultVersion:    pc.DefaultVersion,
-		SupportedVersions: pc.SupportedVersions,
-	}
+	return Package(pc)
 }

@@ -104,7 +104,7 @@ func TestSanitizePackageList(t *testing.T) {
 			name:     "empty input",
 			input:    []string{},
 			expected: []string{},
-			hasError: false,
+			hasError: true,
 		},
 		{
 			name:     "case insensitive",

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/amoga-io/run/internal/logger"
 	pkg "github.com/amoga-io/run/internal/package"
 	"github.com/spf13/cobra"
 )
@@ -28,20 +29,26 @@ func init() {
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
+	log := logger.GetLogger().WithOperation("install")
+
 	// Handle "list" command
 	if len(args) == 1 && args[0] == "list" {
+		log.Info("Listing available packages")
 		return listPackages()
 	}
 
 	// Show package list and prompt to rerun if no arguments provided
 	if len(args) == 0 && !installAll {
+		log.Info("No packages specified, showing package list")
 		return showPackageListAndPrompt("install")
 	}
 
 	// Validate and sanitize input
 	if !installAll {
+		log.Info("Validating and sanitizing package list", "packages", args)
 		sanitizedArgs, err := pkg.SanitizePackageList(args)
 		if err != nil {
+			log.Error("Input validation failed", "error", err)
 			return fmt.Errorf("input validation failed: %w", err)
 		}
 		args = sanitizedArgs
@@ -49,24 +56,29 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Validate version flag if provided
 	if javaVersion != "" {
+		log.Info("Validating version flag", "version", javaVersion)
 		// Check if any of the packages support version selection
 		versionSupported := false
 		for _, pkgName := range args {
 			if pkg.SupportsVersion(pkgName) {
 				versionSupported = true
 				if err := pkg.ValidateVersion(pkgName, javaVersion); err != nil {
+					log.Error("Version validation failed", "package", pkgName, "version", javaVersion, "error", err)
 					return fmt.Errorf("invalid version for %s: %w", pkgName, err)
 				}
 			}
 		}
 
 		if !versionSupported {
+			log.Error("No packages support version selection", "packages", args)
 			return fmt.Errorf("none of the specified packages support version selection")
 		}
 	}
 
+	log.Info("Creating package manager")
 	manager, err := pkg.NewManager()
 	if err != nil {
+		log.Error("Failed to create package manager", "error", err)
 		return err
 	}
 
@@ -78,21 +90,26 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		for _, pkg := range allPackages {
 			packagesToInstall = append(packagesToInstall, pkg.Name)
 		}
+		log.Info("Installing all packages", "count", len(packagesToInstall))
 		fmt.Printf("Installing all packages (%d total)...\n", len(packagesToInstall))
 	} else {
 		// Validate all packages exist before starting installation
 		for _, packageName := range args {
 			if _, exists := pkg.GetPackage(packageName); !exists {
+				log.Error("Package not found", "package", packageName)
 				return fmt.Errorf("package '%s' not found. Run 'run install list' to see available packages", packageName)
 			}
 		}
 		packagesToInstall = args
+		log.Info("Installing specific packages", "packages", packagesToInstall)
 	}
 
 	// Install packages in parallel
+	log.Info("Starting parallel installation", "packages", packagesToInstall)
 	results := installPackagesParallel(manager, packagesToInstall)
 
 	// Show summary
+	log.Info("Installation completed, showing summary")
 	showInstallSummary(results)
 
 	return nil

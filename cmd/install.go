@@ -49,8 +49,19 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Validate version flag if provided
 	if javaVersion != "" {
-		if err := pkg.ValidateVersionString(javaVersion); err != nil {
-			return fmt.Errorf("invalid version: %w", err)
+		// Check if any of the packages support version selection
+		versionSupported := false
+		for _, pkgName := range args {
+			if pkg.SupportsVersion(pkgName) {
+				versionSupported = true
+				if err := pkg.ValidateVersion(pkgName, javaVersion); err != nil {
+					return fmt.Errorf("invalid version for %s: %w", pkgName, err)
+				}
+			}
+		}
+
+		if !versionSupported {
+			return fmt.Errorf("none of the specified packages support version selection")
 		}
 	}
 
@@ -121,8 +132,8 @@ func installPackagesParallel(manager *pkg.Manager, packages []string) []PackageR
 			fmt.Printf("Installing %s...\n", pkgName)
 
 			var err error
-			// If installing java and --version is set, pass it to the script
-			if pkgName == "java" && javaVersion != "" {
+			// Check if package supports version and version flag is provided
+			if pkg.SupportsVersion(pkgName) && javaVersion != "" {
 				err = manager.InstallPackageWithArgs(pkgName, []string{"--version", javaVersion})
 			} else {
 				err = manager.InstallPackage(pkgName)

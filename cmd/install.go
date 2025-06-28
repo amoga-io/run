@@ -112,9 +112,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return manager.InstallPackage(packageName)
 	}
 
-	// Install packages in parallel using generic function
-	log.Info("Starting parallel installation: %v", packagesToInstall)
-	results := pkg.ExecutePackagesParallel(manager, packagesToInstall, installOperation, "Installing")
+	// Install packages sequentially using generic function
+	log.Info("Starting sequential installation: %v", packagesToInstall)
+	results := pkg.ExecutePackagesSequential(manager, packagesToInstall, installOperation, "Installing")
 
 	// Show summary using generic function
 	log.Info("Installation completed, showing summary")

@@ -65,8 +65,8 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return manager.RemovePackage(packageName)
 	}
 
-	// Remove packages in parallel using generic function
-	results := pkg.ExecutePackagesParallel(manager, packagesToRemove, removeOperation, "Removing")
+	// Remove packages sequentially using generic function
+	results := pkg.ExecutePackagesSequential(manager, packagesToRemove, removeOperation, "Removing")
 
 	// Show summary using generic function
 	pkg.ShowOperationSummary(results, "removed", "run remove")

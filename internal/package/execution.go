@@ -3,7 +3,6 @@ package pkg
 import (
 	"fmt"
 	"strings"
-	"sync"
 )
 
 // PackageResult represents the result of a package operation
@@ -16,70 +15,47 @@ type PackageResult struct {
 // PackageOperation represents a function that operates on a package
 type PackageOperation func(packageName string) error
 
-// ExecutePackagesParallel executes package operations in parallel with proper synchronization
-func ExecutePackagesParallel(
+// ExecutePackagesSequential executes package operations sequentially
+func ExecutePackagesSequential(
 	manager *Manager,
 	packages []string,
 	operation PackageOperation,
 	operationName string,
 ) []PackageResult {
-	var wg sync.WaitGroup
-	resultChan := make(chan PackageResult, len(packages))
-
-	// Use a mutex to protect shared state
-	var resultMutex sync.Mutex
 	var allResults []PackageResult
 
-	// Start goroutines for each package
+	// Process packages sequentially
 	for _, packageName := range packages {
-		wg.Add(1)
-		go func(pkgName string) {
-			defer wg.Done()
-
-			// Acquire lock for this package
-			if err := AcquirePackageLock(pkgName); err != nil {
-				result := PackageResult{
-					Name:    pkgName,
-					Success: false,
-					Error:   fmt.Errorf("failed to acquire lock: %w", err),
-				}
-				resultChan <- result
-				fmt.Printf("✗ %s failed to acquire lock: %v\n", pkgName, err)
-				return
-			}
-			defer ReleasePackageLock(pkgName)
-
-			fmt.Printf("%s %s...\n", operationName, pkgName)
-
-			err := operation(pkgName)
-
+		// Acquire lock for this package
+		if err := AcquirePackageLock(packageName); err != nil {
 			result := PackageResult{
-				Name:    pkgName,
-				Success: err == nil,
-				Error:   err,
+				Name:    packageName,
+				Success: false,
+				Error:   fmt.Errorf("failed to acquire lock: %w", err),
 			}
+			allResults = append(allResults, result)
+			fmt.Printf("✗ %s failed to acquire lock: %v\n", packageName, err)
+			continue
+		}
+		defer ReleasePackageLock(packageName)
 
-			if result.Success {
-				fmt.Printf("✓ %s %s successfully\n", pkgName, operationName)
-			} else {
-				fmt.Printf("✗ %s failed to %s: %v\n", pkgName, operationName, err)
-			}
+		fmt.Printf("%s %s...\n", operationName, packageName)
 
-			resultChan <- result
-		}(packageName)
-	}
+		err := operation(packageName)
 
-	// Wait for all goroutines to complete
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
+		result := PackageResult{
+			Name:    packageName,
+			Success: err == nil,
+			Error:   err,
+		}
 
-	// Collect results with proper synchronization
-	for result := range resultChan {
-		resultMutex.Lock()
+		if result.Success {
+			fmt.Printf("✓ %s %s successfully\n", packageName, operationName)
+		} else {
+			fmt.Printf("✗ %s failed to %s: %v\n", packageName, operationName, err)
+		}
+
 		allResults = append(allResults, result)
-		resultMutex.Unlock()
 	}
 
 	return allResults

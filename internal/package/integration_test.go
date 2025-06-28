@@ -130,11 +130,11 @@ func testRemovalSimulation(t *testing.T, manager *Manager) {
 	_ = version // Use version to avoid unused variable warning
 }
 
-// TestParallelOperations tests parallel package operations
-func TestParallelOperations(t *testing.T) {
+// TestSequentialOperations tests sequential package operations
+func TestSequentialOperations(t *testing.T) {
 	suite := NewIntegrationTestSuite(t)
 
-	// Test parallel execution setup
+	// Test sequential execution setup
 	packages := []string{"python", "node", "docker"}
 
 	// Create a simple operation function for testing
@@ -147,8 +147,8 @@ func TestParallelOperations(t *testing.T) {
 		return nil
 	}
 
-	// Test parallel execution
-	results := ExecutePackagesParallel(suite.manager, packages, testOperation, "Testing")
+	// Test sequential execution
+	results := ExecutePackagesSequential(suite.manager, packages, testOperation, "Testing")
 
 	if len(results) != len(packages) {
 		t.Fatalf("Expected %d results, got %d", len(packages), len(results))

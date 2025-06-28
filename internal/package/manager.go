@@ -37,7 +37,7 @@ func NewManager() (*Manager, error) {
 	return &Manager{repoPath: resolvedPath}, nil
 }
 
-// InstallPackage installs a package with dependency checking
+// InstallPackage installs a package with dependency checking and rollback support
 func (m *Manager) InstallPackage(packageName string) error {
 	pkg, exists := GetPackage(packageName)
 	if !exists {
@@ -45,6 +45,25 @@ func (m *Manager) InstallPackage(packageName string) error {
 	}
 
 	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
+
+	// Create rollback manager
+	rollbackManager, err := NewRollbackManager()
+	if err != nil {
+		return fmt.Errorf("failed to create rollback manager: %w", err)
+	}
+
+	// Create rollback point
+	rollbackPoint, err := rollbackManager.CreateRollbackPoint(packageName, "install")
+	if err != nil {
+		return fmt.Errorf("failed to create rollback point: %w", err)
+	}
+
+	// Defer rollback cleanup on success
+	defer func() {
+		if err == nil {
+			rollbackManager.CleanupRollbackPoint(rollbackPoint.ID)
+		}
+	}()
 
 	// Validate dependencies before installation
 	if err := ValidateDependencies(); err != nil {
@@ -56,6 +75,8 @@ func (m *Manager) InstallPackage(packageName string) error {
 
 	// Step 1: Check and install dependencies
 	if err := m.installDependencies(pkg); err != nil {
+		// Execute rollback on dependency failure
+		rollbackPoint.ExecuteRollback()
 		return fmt.Errorf("failed to install dependencies: %w", err)
 	}
 
@@ -63,12 +84,20 @@ func (m *Manager) InstallPackage(packageName string) error {
 	if m.isPackageInstalled(pkg) {
 		fmt.Printf("Package %s is already installed, removing first...\n", pkg.Name)
 		if err := m.RemovePackage(packageName); err != nil {
+			// Execute rollback on removal failure
+			rollbackPoint.ExecuteRollback()
 			return fmt.Errorf("failed to remove existing package: %w", err)
 		}
 	}
 
 	// Step 3: Execute installation script
-	return m.executeInstallScript(pkg)
+	if err := m.executeInstallScript(pkg); err != nil {
+		// Execute rollback on installation failure
+		rollbackPoint.ExecuteRollback()
+		return fmt.Errorf("installation failed: %w", err)
+	}
+
+	return nil
 }
 
 // InstallPackageWithArgs installs a package and passes extra arguments to the install script

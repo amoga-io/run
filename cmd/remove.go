@@ -11,14 +11,16 @@ var removeCmd = &cobra.Command{
 	Use:   "remove [package...]",
 	Short: "Remove packages completely from the system",
 	Long:  "Remove one or more packages completely, including all configuration files and traces.",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	RunE:  runRemove,
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
+	// Show package list and prompt to rerun if no arguments provided
 	if len(args) == 0 {
-		return listPackages()
+		return showPackageListAndPrompt("remove")
 	}
+
 	// Validate packages exist before starting removal
 	for _, packageName := range args {
 		if _, exists := pkg.GetPackage(packageName); !exists {
@@ -37,7 +39,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		if err := manager.RemovePackage(packageName); err != nil {
 			return fmt.Errorf("failed to remove %s: %w", packageName, err)
 		}
-		fmt.Printf("✓ %s removed successfully\n\n", packageName)
+		fmt.Printf("✓ %s removed successfully\n", packageName)
 	}
 
 	fmt.Printf("✓ All packages removed successfully!\n")

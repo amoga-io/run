@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/amoga-io/run/internal/logger"
 )
+
+// Global mutex to synchronize system package installations
+var systemPackageMutex sync.Mutex
 
 // RequirementCategory defines different types of system requirements
 type RequirementCategory string
@@ -101,6 +105,10 @@ func InstallSystemPackages(packages []string) error {
 		return nil
 	}
 
+	// Acquire global lock to prevent concurrent apt operations
+	systemPackageMutex.Lock()
+	defer systemPackageMutex.Unlock()
+
 	// Validate sudo access before proceeding
 	if err := validateSudoAccess(); err != nil {
 		return fmt.Errorf("sudo validation failed: %w", err)
@@ -193,6 +201,10 @@ func InstallDependencies(missing []Dependency) error {
 	if len(missing) == 0 {
 		return nil
 	}
+
+	// Acquire global lock to prevent concurrent apt operations
+	systemPackageMutex.Lock()
+	defer systemPackageMutex.Unlock()
 
 	// Validate sudo access before proceeding
 	if err := validateSudoAccess(); err != nil {

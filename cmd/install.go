@@ -94,7 +94,7 @@ type PackageResult struct {
 	Error   error
 }
 
-// installPackagesParallel installs multiple packages in parallel
+// installPackagesParallel installs multiple packages in parallel with proper locking
 func installPackagesParallel(manager *pkg.Manager, packages []string) []PackageResult {
 	var wg sync.WaitGroup
 	resultChan := make(chan PackageResult, len(packages))
@@ -104,6 +104,19 @@ func installPackagesParallel(manager *pkg.Manager, packages []string) []PackageR
 		wg.Add(1)
 		go func(pkgName string) {
 			defer wg.Done()
+
+			// Acquire lock for this package
+			if err := pkg.AcquirePackageLock(pkgName); err != nil {
+				result := PackageResult{
+					Name:    pkgName,
+					Success: false,
+					Error:   fmt.Errorf("failed to acquire lock: %w", err),
+				}
+				resultChan <- result
+				fmt.Printf("✗ %s failed to acquire lock: %v\n", pkgName, err)
+				return
+			}
+			defer pkg.ReleasePackageLock(pkgName)
 
 			fmt.Printf("Installing %s...\n", pkgName)
 

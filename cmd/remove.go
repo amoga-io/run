@@ -71,7 +71,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// removePackagesParallel removes multiple packages in parallel
+// removePackagesParallel removes multiple packages in parallel with proper locking
 func removePackagesParallel(manager *pkg.Manager, packages []string) []PackageResult {
 	var wg sync.WaitGroup
 	resultChan := make(chan PackageResult, len(packages))
@@ -81,6 +81,19 @@ func removePackagesParallel(manager *pkg.Manager, packages []string) []PackageRe
 		wg.Add(1)
 		go func(pkgName string) {
 			defer wg.Done()
+
+			// Acquire lock for this package
+			if err := pkg.AcquirePackageLock(pkgName); err != nil {
+				result := PackageResult{
+					Name:    pkgName,
+					Success: false,
+					Error:   fmt.Errorf("failed to acquire lock: %w", err),
+				}
+				resultChan <- result
+				fmt.Printf("✗ %s failed to acquire lock: %v\n", pkgName, err)
+				return
+			}
+			defer pkg.ReleasePackageLock(pkgName)
 
 			fmt.Printf("Removing %s...\n", pkgName)
 

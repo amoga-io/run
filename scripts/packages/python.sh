@@ -45,14 +45,20 @@ fi
 mkdir -p /var/log/django
 mkdir -p /var/log/celery
 
-# Set permissions (adjust user/group as needed)
-chown -R azureuser:azureuser /var/log/django
-chown -R azureuser:azureuser /var/log/celery
+# Get the current user (who invoked sudo) instead of hardcoded azureuser
+CURRENT_USER=${SUDO_USER:-$(who am i | awk '{print $1}')}
+if [ -z "$CURRENT_USER" ]; then
+  CURRENT_USER=$(logname 2>/dev/null || echo "root")
+fi
+
+# Set permissions using current user
+chown -R "$CURRENT_USER:$CURRENT_USER" /var/log/django
+chown -R "$CURRENT_USER:$CURRENT_USER" /var/log/celery
 chmod 755 /var/log/django
 chmod 755 /var/log/celery
 
 # Print status
-echo "Log directories created and permissions set"
+echo "Log directories created and permissions set for user: $CURRENT_USER"
 echo "Django logs: /var/log/django"
 echo "Celery logs: /var/log/celery"
 

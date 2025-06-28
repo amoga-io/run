@@ -40,6 +40,99 @@ func NewManager() (*Manager, error) {
 
 // InstallPackage installs a package with dependency checking and rollback support
 func (m *Manager) InstallPackage(packageName string) error {
+	pkg, err := m.validatePackage(packageName)
+	if err != nil {
+		return err
+	}
+
+	rollbackPoint, err := m.setupRollback(packageName)
+	if err != nil {
+		return err
+	}
+	defer m.cleanupRollback(rollbackPoint, err)
+
+	if err := m.installDependencies(pkg); err != nil {
+		return m.handleDependencyError(err, rollbackPoint)
+	}
+
+	if err := m.handleExistingInstallation(pkg, packageName, rollbackPoint); err != nil {
+		return err
+	}
+
+	return m.executeInstallation(pkg, rollbackPoint)
+}
+
+// validatePackage validates and retrieves package information
+func (m *Manager) validatePackage(packageName string) (Package, error) {
+	pkg, exists := GetPackage(packageName)
+	if !exists {
+		return Package{}, fmt.Errorf("package '%s' not found", packageName)
+	}
+
+	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
+	return pkg, nil
+}
+
+// setupRollback creates rollback manager and rollback point
+func (m *Manager) setupRollback(packageName string) (*RollbackPoint, error) {
+	rollbackManager, err := NewRollbackManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rollback manager: %w", err)
+	}
+
+	rollbackPoint, err := rollbackManager.CreateRollbackPoint(packageName, "install")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rollback point: %w", err)
+	}
+
+	return rollbackPoint, nil
+}
+
+// cleanupRollback cleans up rollback point on success
+func (m *Manager) cleanupRollback(rollbackPoint *RollbackPoint, err error) {
+	if err == nil && rollbackPoint != nil {
+		rollbackManager, _ := NewRollbackManager()
+		if rollbackManager != nil {
+			rollbackManager.CleanupRollbackPoint(rollbackPoint.ID)
+		}
+	}
+}
+
+// handleDependencyError handles dependency installation errors with rollback
+func (m *Manager) handleDependencyError(err error, rollbackPoint *RollbackPoint) error {
+	if rollbackPoint != nil {
+		rollbackPoint.ExecuteRollback()
+	}
+	return fmt.Errorf("failed to install dependencies: %w", err)
+}
+
+// handleExistingInstallation handles existing package installation
+func (m *Manager) handleExistingInstallation(pkg Package, packageName string, rollbackPoint *RollbackPoint) error {
+	if m.isPackageInstalled(pkg) {
+		fmt.Printf("Package %s is already installed, removing first...\n", pkg.Name)
+		if err := m.RemovePackage(packageName); err != nil {
+			if rollbackPoint != nil {
+				rollbackPoint.ExecuteRollback()
+			}
+			return fmt.Errorf("failed to remove existing package: %w", err)
+		}
+	}
+	return nil
+}
+
+// executeInstallation executes the actual installation
+func (m *Manager) executeInstallation(pkg Package, rollbackPoint *RollbackPoint) error {
+	if err := m.executeInstallScript(pkg); err != nil {
+		if rollbackPoint != nil {
+			rollbackPoint.ExecuteRollback()
+		}
+		return fmt.Errorf("installation failed: %w", err)
+	}
+	return nil
+}
+
+// InstallPackageWithArgs installs a package and passes extra arguments to the install script
+func (m *Manager) InstallPackageWithArgs(packageName string, extraArgs []string) error {
 	pkg, exists := GetPackage(packageName)
 	if !exists {
 		return fmt.Errorf("package '%s' not found", packageName)
@@ -91,48 +184,14 @@ func (m *Manager) InstallPackage(packageName string) error {
 		}
 	}
 
-	// Step 3: Execute installation script
-	if err := m.executeInstallScript(pkg); err != nil {
+	// Step 3: Execute installation script with extra arguments
+	if err := m.executeInstallScriptWithArgs(pkg, extraArgs); err != nil {
 		// Execute rollback on installation failure
 		rollbackPoint.ExecuteRollback()
 		return fmt.Errorf("installation failed: %w", err)
 	}
 
 	return nil
-}
-
-// InstallPackageWithArgs installs a package and passes extra arguments to the install script
-func (m *Manager) InstallPackageWithArgs(packageName string, extraArgs []string) error {
-	pkg, exists := GetPackage(packageName)
-	if !exists {
-		return fmt.Errorf("package '%s' not found", packageName)
-	}
-
-	fmt.Printf("Installing %s (%s)...\n", pkg.Name, pkg.Description)
-
-	// Validate dependencies before installation
-	if err := ValidateDependencies(); err != nil {
-		return fmt.Errorf("dependency validation failed: %w", err)
-	}
-
-	// Smart suggestions before installation
-	m.provideSuggestions(pkg)
-
-	// Step 1: Check and install dependencies
-	if err := m.installDependencies(pkg); err != nil {
-		return fmt.Errorf("failed to install dependencies: %w", err)
-	}
-
-	// Step 2: Check if package is already installed, remove if so
-	if m.isPackageInstalled(pkg) {
-		fmt.Printf("Package %s is already installed, removing first...\n", pkg.Name)
-		if err := m.RemovePackage(packageName); err != nil {
-			return fmt.Errorf("failed to remove existing package: %w", err)
-		}
-	}
-
-	// Step 3: Execute installation script with extra arguments
-	return m.executeInstallScriptWithArgs(pkg, extraArgs)
 }
 
 // provideSuggestions provides smart suggestions based on package being installed

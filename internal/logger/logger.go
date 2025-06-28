@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -170,8 +171,11 @@ func (l *Logger) Close() error {
 	return nil
 }
 
-// Global logger instance
-var globalLogger *Logger
+// Global logger instance with thread-safe initialization
+var (
+	globalLogger *Logger
+	loggerOnce   sync.Once
+)
 
 // InitLogger initializes the global logger
 func InitLogger(level LogLevel) error {
@@ -180,12 +184,20 @@ func InitLogger(level LogLevel) error {
 	return err
 }
 
-// GetLogger returns the global logger
+// GetLogger returns the global logger with thread-safe initialization
 func GetLogger() *Logger {
-	if globalLogger == nil {
-		// Initialize with INFO level if not initialized
-		InitLogger(INFO)
-	}
+	loggerOnce.Do(func() {
+		if globalLogger == nil {
+			// Initialize with INFO level if not initialized
+			if err := InitLogger(INFO); err != nil {
+				// If initialization fails, create a minimal logger
+				globalLogger = &Logger{
+					level:   INFO,
+					context: make(map[string]interface{}),
+				}
+			}
+		}
+	})
 	return globalLogger
 }
 

@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/amoga-io/run/internal/logger"
 	pkg "github.com/amoga-io/run/internal/package"
@@ -13,7 +12,6 @@ import (
 var (
 	packageVersion string
 	installAll     bool
-	// installMutex   sync.RWMutex
 )
 
 var installCmd = &cobra.Command{
@@ -105,133 +103,24 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		log.Info("Installing specific packages: %v", packagesToInstall)
 	}
 
-	// Install packages in parallel with proper synchronization
-	log.Info("Starting parallel installation: %v", packagesToInstall)
-	results := installPackagesParallel(manager, packagesToInstall)
+	// Create installation operation function
+	installOperation := func(packageName string) error {
+		// Check if package supports version and version flag is provided
+		if pkg.SupportsVersion(packageName) && packageVersion != "" {
+			return manager.InstallPackageWithArgs(packageName, []string{"--version", packageVersion})
+		}
+		return manager.InstallPackage(packageName)
+	}
 
-	// Show summary
+	// Install packages in parallel using generic function
+	log.Info("Starting parallel installation: %v", packagesToInstall)
+	results := pkg.ExecutePackagesParallel(manager, packagesToInstall, installOperation, "Installing")
+
+	// Show summary using generic function
 	log.Info("Installation completed, showing summary")
-	showInstallSummary(results)
+	pkg.ShowOperationSummary(results, "installed", "run install")
 
 	return nil
-}
-
-// PackageResult represents the result of a package operation
-type PackageResult struct {
-	Name    string
-	Success bool
-	Error   error
-}
-
-// installPackagesParallel installs multiple packages in parallel with proper locking
-func installPackagesParallel(manager *pkg.Manager, packages []string) []PackageResult {
-	var wg sync.WaitGroup
-	resultChan := make(chan PackageResult, len(packages))
-
-	// Use a mutex to protect shared state
-	var resultMutex sync.Mutex
-	var allResults []PackageResult
-
-	// Start goroutines for each package
-	for _, packageName := range packages {
-		wg.Add(1)
-		go func(pkgName string) {
-			defer wg.Done()
-
-			// Acquire lock for this package
-			if err := pkg.AcquirePackageLock(pkgName); err != nil {
-				result := PackageResult{
-					Name:    pkgName,
-					Success: false,
-					Error:   fmt.Errorf("failed to acquire lock: %w", err),
-				}
-				resultChan <- result
-				fmt.Printf("✗ %s failed to acquire lock: %v\n", pkgName, err)
-				return
-			}
-			defer pkg.ReleasePackageLock(pkgName)
-
-			fmt.Printf("Installing %s...\n", pkgName)
-
-			var err error
-			// Check if package supports version and version flag is provided
-			if pkg.SupportsVersion(pkgName) && packageVersion != "" {
-				err = manager.InstallPackageWithArgs(pkgName, []string{"--version", packageVersion})
-			} else {
-				err = manager.InstallPackage(pkgName)
-			}
-
-			result := PackageResult{
-				Name:    pkgName,
-				Success: err == nil,
-				Error:   err,
-			}
-
-			if result.Success {
-				fmt.Printf("✓ %s installed successfully\n", pkgName)
-			} else {
-				fmt.Printf("✗ %s failed to install: %v\n", pkgName, err)
-			}
-
-			resultChan <- result
-		}(packageName)
-	}
-
-	// Wait for all goroutines to complete
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	// Collect results with proper synchronization
-	for result := range resultChan {
-		resultMutex.Lock()
-		allResults = append(allResults, result)
-		resultMutex.Unlock()
-	}
-
-	return allResults
-}
-
-// showInstallSummary displays a summary of installation results
-func showInstallSummary(results []PackageResult) {
-	var successful, failed []string
-
-	for _, result := range results {
-		if result.Success {
-			successful = append(successful, result.Name)
-		} else {
-			failed = append(failed, result.Name)
-		}
-	}
-
-	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Println("INSTALLATION SUMMARY")
-	fmt.Println(strings.Repeat("=", 50))
-
-	if len(successful) > 0 {
-		fmt.Printf("✓ Successfully installed (%d): %s\n", len(successful), strings.Join(successful, ", "))
-	}
-
-	if len(failed) > 0 {
-		fmt.Printf("✗ Failed to install (%d): %s\n", len(failed), strings.Join(failed, ", "))
-		fmt.Println("\nFailed packages details:")
-		for _, result := range results {
-			if !result.Success {
-				fmt.Printf("  • %s: %v\n", result.Name, result.Error)
-			}
-		}
-	}
-
-	total := len(results)
-	if total > 0 {
-		fmt.Printf("\nTotal: %d packages processed\n", total)
-		fmt.Printf("Success rate: %.1f%% (%d/%d)\n", float64(len(successful))/float64(total)*100, len(successful), total)
-
-		if len(failed) > 0 {
-			fmt.Printf("\nTo retry failed packages: run install %s\n", strings.Join(failed, " "))
-		}
-	}
 }
 
 // showPackageListAndPrompt displays available packages and prompts user to rerun command

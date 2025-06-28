@@ -3,12 +3,16 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	pkg "github.com/amoga-io/run/internal/package"
 	"github.com/spf13/cobra"
 )
 
-var javaVersion string
+var (
+	javaVersion string
+	installAll  bool
+)
 
 var installCmd = &cobra.Command{
 	Use:   "install [package...]",
@@ -20,6 +24,7 @@ var installCmd = &cobra.Command{
 
 func init() {
 	installCmd.Flags().StringVar(&javaVersion, "version", "", "Java version to install (11, 17, 21)")
+	installCmd.Flags().BoolVar(&installAll, "all", false, "Install all available packages")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
@@ -29,15 +34,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Show package list and prompt to rerun if no arguments provided
-	if len(args) == 0 {
+	if len(args) == 0 && !installAll {
 		return showPackageListAndPrompt("install")
-	}
-
-	// Validate all packages exist before starting installation
-	for _, packageName := range args {
-		if _, exists := pkg.GetPackage(packageName); !exists {
-			return fmt.Errorf("package '%s' not found. Run 'run install list' to see available packages", packageName)
-		}
 	}
 
 	manager, err := pkg.NewManager()
@@ -45,36 +43,130 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Install each package
-	for _, packageName := range args {
-		if err := installSinglePackage(manager, packageName); err != nil {
-			return fmt.Errorf("failed to install %s: %w", packageName, err)
+	var packagesToInstall []string
+
+	if installAll {
+		// Get all available packages
+		allPackages := pkg.ListPackages()
+		for _, pkg := range allPackages {
+			packagesToInstall = append(packagesToInstall, pkg.Name)
 		}
+		fmt.Printf("Installing all packages (%d total)...\n", len(packagesToInstall))
+	} else {
+		// Validate all packages exist before starting installation
+		for _, packageName := range args {
+			if _, exists := pkg.GetPackage(packageName); !exists {
+				return fmt.Errorf("package '%s' not found. Run 'run install list' to see available packages", packageName)
+			}
+		}
+		packagesToInstall = args
 	}
 
-	fmt.Printf("✓ All packages installed successfully!\n")
+	// Install packages in parallel
+	results := installPackagesParallel(manager, packagesToInstall)
+
+	// Show summary
+	showInstallSummary(results)
+
 	return nil
 }
 
-// installSinglePackage installs a single package with proper version handling
-func installSinglePackage(manager *pkg.Manager, packageName string) error {
-	fmt.Printf("\nInstalling %s...\n", packageName)
+// PackageResult represents the result of a package operation
+type PackageResult struct {
+	Name    string
+	Success bool
+	Error   error
+}
 
-	// If installing java and --version is set, pass it to the script
-	if packageName == "java" && javaVersion != "" {
-		if err := manager.InstallPackageWithArgs(packageName, []string{"--version", javaVersion}); err != nil {
-			return fmt.Errorf("failed to install %s: %w", packageName, err)
+// installPackagesParallel installs multiple packages in parallel
+func installPackagesParallel(manager *pkg.Manager, packages []string) []PackageResult {
+	var wg sync.WaitGroup
+	resultChan := make(chan PackageResult, len(packages))
+
+	// Start goroutines for each package
+	for _, packageName := range packages {
+		wg.Add(1)
+		go func(pkgName string) {
+			defer wg.Done()
+			
+			fmt.Printf("Installing %s...\n", pkgName)
+			
+			var err error
+			// If installing java and --version is set, pass it to the script
+			if pkgName == "java" && javaVersion != "" {
+				err = manager.InstallPackageWithArgs(pkgName, []string{"--version", javaVersion})
+			} else {
+				err = manager.InstallPackage(pkgName)
+			}
+
+			result := PackageResult{
+				Name:    pkgName,
+				Success: err == nil,
+				Error:   err,
+			}
+
+			if result.Success {
+				fmt.Printf("✓ %s installed successfully\n", pkgName)
+			} else {
+				fmt.Printf("✗ %s failed to install: %v\n", pkgName, err)
+			}
+
+			resultChan <- result
+		}(packageName)
+	}
+
+	// Wait for all goroutines to complete
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results
+	var allResults []PackageResult
+	for result := range resultChan {
+		allResults = append(allResults, result)
+	}
+
+	return allResults
+}
+
+// showInstallSummary displays a summary of installation results
+func showInstallSummary(results []PackageResult) {
+	var successful, failed []string
+
+	for _, result := range results {
+		if result.Success {
+			successful = append(successful, result.Name)
+		} else {
+			failed = append(failed, result.Name)
 		}
-		fmt.Printf("✓ %s installed successfully\n", packageName)
-		return nil
 	}
 
-	// Default: install package with no extra args
-	if err := manager.InstallPackage(packageName); err != nil {
-		return fmt.Errorf("failed to install %s: %w", packageName, err)
+	fmt.Println("\n" + strings.Repeat("=", 50))
+	fmt.Println("INSTALLATION SUMMARY")
+	fmt.Println(strings.Repeat("=", 50))
+
+	if len(successful) > 0 {
+		fmt.Printf("✓ Successfully installed (%d): %s\n", len(successful), strings.Join(successful, ", "))
 	}
-	fmt.Printf("✓ %s installed successfully\n", packageName)
-	return nil
+
+	if len(failed) > 0 {
+		fmt.Printf("✗ Failed to install (%d): %s\n", len(failed), strings.Join(failed, ", "))
+		fmt.Println("\nFailed packages details:")
+		for _, result := range results {
+			if !result.Success {
+				fmt.Printf("  • %s: %v\n", result.Name, result.Error)
+			}
+		}
+	}
+
+	total := len(results)
+	fmt.Printf("\nTotal: %d packages processed\n", total)
+	fmt.Printf("Success rate: %.1f%% (%d/%d)\n", float64(len(successful))/float64(total)*100, len(successful), total)
+
+	if len(failed) > 0 {
+		fmt.Printf("\nTo retry failed packages: run install %s\n", strings.Join(failed, " "))
+	}
 }
 
 // showPackageListAndPrompt displays available packages and prompts user to rerun command
@@ -99,6 +191,7 @@ func showPackageListAndPrompt(action string) error {
 	fmt.Printf("run %s node python\n", action)
 	fmt.Printf("run %s java --version 17\n", action)
 	fmt.Printf("run %s essentials\n", action)
+	fmt.Printf("run %s --all\n", action)
 	fmt.Println()
 	fmt.Printf("Run run %s list to see all.\n", action)
 	

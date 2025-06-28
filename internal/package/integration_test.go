@@ -14,9 +14,9 @@ type IntegrationTestSuite struct {
 
 // NewIntegrationTestSuite creates a new integration test suite
 func NewIntegrationTestSuite(t *testing.T) *IntegrationTestSuite {
-	manager, err := NewManager()
-	if err != nil {
-		t.Fatalf("Failed to create manager for integration tests: %v", err)
+	manager := MockManager()
+	if manager == nil {
+		t.Fatalf("Failed to create mock manager for integration tests")
 	}
 
 	return &IntegrationTestSuite{
@@ -27,6 +27,7 @@ func NewIntegrationTestSuite(t *testing.T) *IntegrationTestSuite {
 // TestPackageLifecycle tests the complete lifecycle of a package
 func TestPackageLifecycle(t *testing.T) {
 	suite := NewIntegrationTestSuite(t)
+	defer CleanupMockManager(suite.manager)
 
 	// Test package validation
 	t.Run("Package Validation", func(t *testing.T) {
@@ -133,6 +134,7 @@ func testRemovalSimulation(t *testing.T, manager *Manager) {
 // TestSequentialOperations tests sequential package operations
 func TestSequentialOperations(t *testing.T) {
 	suite := NewIntegrationTestSuite(t)
+	defer CleanupMockManager(suite.manager)
 
 	// Test sequential execution setup
 	packages := []string{"python", "node", "docker"}

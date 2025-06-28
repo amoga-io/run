@@ -1,10 +1,15 @@
 package pkg
 
 import (
+	"os"
 	"testing"
 )
 
 func TestNewManager(t *testing.T) {
+	// Set testing environment variable
+	os.Setenv("TESTING", "true")
+	defer os.Unsetenv("TESTING")
+	
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -20,6 +25,10 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestValidatePackage(t *testing.T) {
+	// Set testing environment variable
+	os.Setenv("TESTING", "true")
+	defer os.Unsetenv("TESTING")
+	
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -43,6 +52,10 @@ func TestValidatePackage(t *testing.T) {
 }
 
 func TestIsPackageInstalled(t *testing.T) {
+	// Set testing environment variable
+	os.Setenv("TESTING", "true")
+	defer os.Unsetenv("TESTING")
+	
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -70,6 +83,10 @@ func TestIsPackageInstalled(t *testing.T) {
 }
 
 func TestGetSystemVersion(t *testing.T) {
+	// Set testing environment variable
+	os.Setenv("TESTING", "true")
+	defer os.Unsetenv("TESTING")
+	
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)

@@ -64,6 +64,12 @@ retry sudo apt install -y -qq \
   -o Dpkg::Options::="--force-confdef" \
   -o Dpkg::Options::="--force-confold"
 
+# Create www-data user if it doesn't exist
+if ! id "www-data" &>/dev/null; then
+    echo "Creating www-data user..."
+    sudo useradd -r -s /bin/false www-data
+fi
+
 # Enable and start PHP-FPM
 echo "Starting PHP-FPM service..."
 sudo systemctl enable php"$version"-fpm

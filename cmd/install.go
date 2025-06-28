@@ -19,9 +19,28 @@ var (
 var installCmd = &cobra.Command{
 	Use:   "install [package...]",
 	Short: "Install packages using installation scripts",
-	Long:  "Install one or more packages. Dependencies will be checked and installed automatically.",
-	Args:  cobra.ArbitraryArgs,
-	RunE:  runInstall,
+	Long: `Install one or more packages. Dependencies will be checked and installed automatically.
+
+Supported packages:
+  • node        - Node.js runtime with npm (versions: 16, 18, 20, 21)
+  • python      - Python programming language (versions: 3.8, 3.9, 3.10, 3.11, 3.12)
+  • php         - PHP programming language (versions: 8.1, 8.2, 8.3)
+  • java        - OpenJDK Java Development Kit (versions: 11, 17, 21)
+  • docker      - Docker containerization platform
+  • nginx       - High-performance web server (versions: stable, mainline)
+  • postgres    - PostgreSQL database server (versions: 15, 16, 17)
+  • pm2         - Process manager for Node.js applications
+  • essentials  - System essentials and development tools
+
+Examples:
+  run install node python docker
+  run install node --version 20
+  run install python --version 3.10
+  run install --all
+  run install node --clean
+  run install node --dry-run`,
+	Args: cobra.ArbitraryArgs,
+	RunE: runInstall,
 }
 
 func init() {

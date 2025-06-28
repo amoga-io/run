@@ -363,14 +363,96 @@ func (m *Manager) installDependencies(pkg Package) error {
 	return nil
 }
 
-// IsPackageInstalled checks if a package is installed by checking its commands
+// IsPackageInstalled checks if a package is installed by checking its commands and services
 func (m *Manager) IsPackageInstalled(pkg Package) bool {
+	// Check commands first
 	for _, cmd := range pkg.Commands {
 		if !system.CommandExists(cmd) {
 			return false
 		}
 	}
-	return len(pkg.Commands) > 0 // Only return true if there are commands to check
+
+	// Check service status for relevant packages
+	switch pkg.Name {
+	case "docker":
+		return m.checkDockerService()
+	case "nginx":
+		return m.checkNginxService()
+	case "postgres":
+		return m.checkPostgresService()
+	case "php":
+		return m.checkPHPService()
+	}
+
+	return len(pkg.Commands) > 0
+}
+
+// checkDockerService checks if Docker service is running
+func (m *Manager) checkDockerService() bool {
+	// Check if docker command exists
+	if !system.CommandExists("docker") {
+		return false
+	}
+
+	// Check if Docker service is active
+	cmd := exec.Command("systemctl", "is-active", "docker")
+	if err := cmd.Run(); err != nil {
+		return false
+	}
+
+	return true
+}
+
+// checkNginxService checks if Nginx service is running
+func (m *Manager) checkNginxService() bool {
+	// Check if nginx command exists
+	if !system.CommandExists("nginx") {
+		return false
+	}
+
+	// Check if Nginx service is active
+	cmd := exec.Command("systemctl", "is-active", "nginx")
+	if err := cmd.Run(); err != nil {
+		return false
+	}
+
+	return true
+}
+
+// checkPostgresService checks if PostgreSQL service is running
+func (m *Manager) checkPostgresService() bool {
+	// Check if psql command exists
+	if !system.CommandExists("psql") {
+		return false
+	}
+
+	// Check if PostgreSQL service is active
+	cmd := exec.Command("systemctl", "is-active", "postgresql")
+	if err := cmd.Run(); err != nil {
+		return false
+	}
+
+	return true
+}
+
+// checkPHPService checks if PHP-FPM service is running
+func (m *Manager) checkPHPService() bool {
+	// Check if php command exists
+	if !system.CommandExists("php") {
+		return false
+	}
+
+	// Check if PHP-FPM service is active (try different versions)
+	phpVersions := []string{"php8.3-fpm", "php8.2-fpm", "php8.1-fpm", "php-fpm"}
+	for _, version := range phpVersions {
+		cmd := exec.Command("systemctl", "is-active", version)
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+	}
+
+	// If no FPM service is running, but CLI works, consider it installed
+	return true
 }
 
 // executeInstallScript executes the installation script for a package

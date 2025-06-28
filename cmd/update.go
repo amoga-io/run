@@ -16,8 +16,22 @@ import (
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update CLI to latest version from Git",
-	Long:  "Pull latest changes from Git repository and rebuild the binary",
-	RunE:  runUpdate,
+	Long: `Pull latest changes from Git repository and rebuild the binary.
+
+The update process:
+  1. Fetches latest changes from the repository
+  2. Handles any local changes gracefully
+  3. Rebuilds the binary with latest features
+  4. Installs the updated binary atomically
+
+Requirements:
+  • Git must be available
+  • Go must be available for building
+  • Sudo access for binary installation
+
+Examples:
+  run update`,
+	RunE: runUpdate,
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {

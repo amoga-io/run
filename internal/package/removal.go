@@ -160,22 +160,23 @@ func (m *Manager) isInstalledViaAPT(packageName string) bool {
 			return false
 		}
 
-		// Check if it's installed via apt
-		cmd := exec.Command("dpkg", "-l", "docker-ce")
-		if err := cmd.Run(); err == nil {
-			return true
+		// Check multiple Docker packages
+		dockerPackages := []string{"docker-ce", "docker-ce-cli", "containerd.io", "docker.io"}
+		for _, pkg := range dockerPackages {
+			cmd := exec.Command("dpkg", "-l", pkg)
+			if err := cmd.Run(); err == nil {
+				return true
+			}
 		}
 
-		// Check docker.io package
-		cmd = exec.Command("dpkg", "-l", "docker.io")
-		if err := cmd.Run(); err == nil {
-			return true
-		}
-
-		// Check docker-ce-cli package
-		cmd = exec.Command("dpkg", "-l", "docker-ce-cli")
-		if err := cmd.Run(); err == nil {
-			return true
+		// Check apt-cache policy for any docker package
+		cmd := exec.Command("apt-cache", "policy", "docker-ce")
+		output, err := cmd.Output()
+		if err == nil {
+			outputStr := string(output)
+			if strings.Contains(outputStr, "Installed:") && !strings.Contains(outputStr, "(none)") {
+				return true
+			}
 		}
 
 		return false
@@ -279,6 +280,11 @@ func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, er
 		return result, nil
 	}
 
+	// Special handling for Docker
+	if packageName == "docker" {
+		return m.removeDocker(dryRun)
+	}
+
 	// Show warning for system packages
 	fmt.Printf("⚠️  Removing APT package '%s' - this may affect system stability\n", packageName)
 	fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
@@ -305,6 +311,83 @@ func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, er
 	result.RemovedPaths = []string{
 		fmt.Sprintf("APT package: %s", packageName),
 		"System-wide configuration files",
+	}
+
+	return result, nil
+}
+
+// removeDocker removes Docker specifically
+func (m *Manager) removeDocker(dryRun bool) (*RemovalResult, error) {
+	result := &RemovalResult{
+		PackageName:      "docker",
+		InstallationType: InstallTypeAPT,
+		Success:          false,
+	}
+
+	if dryRun {
+		result.Success = true
+		result.RemovedPaths = []string{
+			"Docker CE packages",
+			"Docker configuration files",
+			"Docker data directory",
+		}
+		return result, nil
+	}
+
+	fmt.Println("Removing Docker completely...")
+
+	// Stop and disable Docker service first
+	serviceCommands := [][]string{
+		{"sudo", "systemctl", "stop", "docker"},
+		{"sudo", "systemctl", "disable", "docker"},
+	}
+
+	for _, cmd := range serviceCommands {
+		execCmd := exec.Command(cmd[0], cmd[1:]...)
+		execCmd.Run() // Don't fail if service doesn't exist
+	}
+
+	// Remove Docker packages
+	dockerPackages := []string{
+		"docker-ce",
+		"docker-ce-cli",
+		"containerd.io",
+		"docker-buildx-plugin",
+		"docker-compose-plugin",
+		"docker.io",
+	}
+
+	// Remove each package individually
+	for _, pkg := range dockerPackages {
+		cmd := exec.Command("sudo", "apt", "remove", "--purge", pkg, "-y")
+		if err := cmd.Run(); err != nil {
+			// Don't treat individual package removal failures as errors
+			// since some packages might not be installed
+			fmt.Printf("Note: %s not found or already removed\n", pkg)
+		}
+	}
+
+	// Clean up
+	cleanupCommands := [][]string{
+		{"sudo", "apt", "autoremove", "-y"},
+		{"sudo", "rm", "-rf", "/var/lib/docker"},
+		{"sudo", "rm", "-rf", "/etc/docker"},
+		{"sudo", "rm", "-rf", "/var/run/docker.sock"},
+		{"sudo", "groupdel", "docker"},
+	}
+
+	for _, cmd := range cleanupCommands {
+		execCmd := exec.Command(cmd[0], cmd[1:]...)
+		execCmd.Run() // Don't fail on cleanup commands
+	}
+
+	result.Success = true
+	result.RemovedPaths = []string{
+		"Docker CE packages",
+		"Docker configuration files",
+		"Docker data directory",
+		"Docker socket",
+		"Docker group",
 	}
 
 	return result, nil

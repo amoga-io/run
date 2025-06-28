@@ -33,8 +33,18 @@ func validateVersion(version string) string {
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version information",
-	Long:  "Display version, build information, and system details for the run CLI",
-	Run:   runVersion,
+	Long: `Display version, build information, and system details for the run CLI.
+
+Shows:
+  • CLI version and build information
+  • Git commit hash and build date
+  • Go version used for building
+  • Operating system and architecture
+  • Development build warnings (if applicable)
+
+Examples:
+  run version`,
+	Run: runVersion,
 }
 
 func runVersion(cmd *cobra.Command, args []string) {

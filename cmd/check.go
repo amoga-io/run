@@ -19,9 +19,21 @@ var (
 var checkCmd = &cobra.Command{
 	Use:   "check [package...]",
 	Short: "Check package installation status and system health",
-	Long:  "Check if packages are installed and working correctly. Also provides system health information.",
-	Args:  cobra.ArbitraryArgs,
-	RunE:  runCheck,
+	Long: `Check if packages are installed and working correctly. Also provides system health information.
+
+The check command verifies:
+  • Package commands are available in PATH
+  • Associated services are running (for applicable packages)
+  • Package versions match expectations
+  • System dependencies are satisfied
+
+Examples:
+  run check node python docker
+  run check --all
+  run check --system
+  run check nginx postgres`,
+	Args: cobra.ArbitraryArgs,
+	RunE: runCheck,
 }
 
 func init() {

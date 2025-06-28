@@ -32,15 +32,19 @@ else
   sudo -u "$TARGET_USER" npm install -g pm2@"$version"
 fi
 
-# Source the user's profile to update PATH and check pm2
-if ! sudo -u "$TARGET_USER" bash -c "source $TARGET_HOME/.profile && which pm2" > /dev/null; then
-  echo "pm2 not found in PATH for $TARGET_USER after install"
-  exit 1
+# Check if PM2 was installed successfully
+PM2_PATH="$TARGET_HOME/.npm-global/bin/pm2"
+if [ -f "$PM2_PATH" ]; then
+    echo "PM2 installed successfully at $PM2_PATH"
+else
+    echo "PM2 installation failed - binary not found at expected location"
+    exit 1
 fi
 
-sudo -u "$TARGET_USER" bash -c "source $TARGET_HOME/.profile && pm2 save"
-sudo chmod 755 "$(sudo -u "$TARGET_USER" bash -c 'source $TARGET_HOME/.profile && which pm2')"
-sudo chmod -R 755 "$(dirname "$(sudo -u "$TARGET_USER" bash -c 'source $TARGET_HOME/.profile && which pm2')")/../lib/node_modules/pm2"
+# Set up PM2 with proper environment
+sudo -u "$TARGET_USER" bash -c "export PATH=\"$TARGET_HOME/.npm-global/bin:\$PATH\" && pm2 save"
+sudo chmod 755 "$PM2_PATH"
+sudo chmod -R 755 "$(dirname "$PM2_PATH")/../lib/node_modules/pm2"
 sudo mkdir -p /var/log/pm2
 sudo chmod 777 /var/log/pm2
-sudo -u "$TARGET_USER" bash -c "source $TARGET_HOME/.profile && pm2 startup systemd"
+sudo -u "$TARGET_USER" bash -c "export PATH=\"$TARGET_HOME/.npm-global/bin:\$PATH\" && pm2 startup systemd"

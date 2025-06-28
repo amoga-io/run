@@ -12,8 +12,21 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "run",
-	Short: "A Git-based CLI for Ubuntu systems",
-	Long:  "A simple Git-based CLI tool that can update itself from GitHub repository.",
+	Short: "Ubuntu Server Package Manager",
+	Long: `A safe and intelligent CLI tool for managing developer and system packages on Ubuntu systems.
+
+Features:
+  • Install development tools (Node.js, Python, Java, PHP)
+  • Manage system services (Docker, Nginx, PostgreSQL)
+  • Version management for supported packages
+  • Automatic dependency resolution
+  • Safe package removal with rollback support
+
+Examples:
+  run install node python docker
+  run install node --version 20
+  run check --all
+  run remove docker --force`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

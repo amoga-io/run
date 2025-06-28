@@ -14,9 +14,26 @@ var dryRunRemove bool
 var removeCmd = &cobra.Command{
 	Use:   "remove [package...]",
 	Short: "Remove packages completely from the system",
-	Long:  "Remove one or more packages completely, including all configuration files and traces.",
-	Args:  cobra.ArbitraryArgs,
-	RunE:  runRemove,
+	Long: `Remove one or more packages completely, including all configuration files and traces.
+
+The remove command will:
+  • Stop and disable associated services
+  • Remove all package files and configurations
+  • Clean up dependencies where safe
+  • Provide detailed removal summary
+
+Safety features:
+  • Critical system packages are protected by default
+  • Use --force to bypass critical package protection
+  • Use --dry-run to preview what would be removed
+
+Examples:
+  run remove node python
+  run remove docker --force
+  run remove node --dry-run
+  run remove --all`,
+	Args: cobra.ArbitraryArgs,
+	RunE: runRemove,
 }
 
 func init() {

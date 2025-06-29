@@ -197,8 +197,17 @@ func (m *Manager) handleExistingInstallation(pkg Package, targetVersion string) 
 	}
 
 	if m.IsPackageInstalled(pkg) {
-		fmt.Printf("Package %s is already installed with a different version. Please remove it first using the CLI remove command.\n", pkg.Name)
-		return false, fmt.Errorf("package %s is already installed with a different version", pkg.Name)
+		// For python, require manual removal for safety
+		if pkg.Name == "python" {
+			fmt.Printf("Package %s is already installed with a different version. Please remove it first using the CLI remove command.\n", pkg.Name)
+			return false, fmt.Errorf("package %s is already installed with a different version", pkg.Name)
+		}
+		// For all other packages, auto-remove existing version (including APT)
+		fmt.Printf("Removing existing %s before installing new version...\n", pkg.Name)
+		_, err := m.SafeRemovePackage(pkg.Name, true, false)
+		if err != nil {
+			return false, fmt.Errorf("failed to remove existing %s: %w", pkg.Name, err)
+		}
 	}
 
 	return false, nil // Proceed with installation

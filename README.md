@@ -42,20 +42,20 @@ run --help
 
 ## CLI Flags Summary Table
 
-| Command | Flag            | Alias | Description                                       |
-| ------- | --------------- | ----- | ------------------------------------------------- |
-| install | --version       | -v    | Install specific version                          |
-|         | --set-active    |       | Set installed version as active (version manager) |
-|         | --all           | -a    | Install all packages                              |
-|         | --clean         | -c    | Force clean reinstallation                        |
-|         | --dry-run       | -d    | Preview install                                   |
-|         | --replace       | -r    | Remove existing version before install            |
-| remove  | --all           | -a    | Remove all packages                               |
-|         | --force         | -f    | Force removal of critical packages                |
-|         | --dry-run       | -d    | Preview removal                                   |
-| check   | --system        | -s    | Check system health                               |
-|         | --all           | -a    | Check all packages                                |
-|         | --list-versions | -l    | List all installed versions                       |
+| Command | Flag           | Alias | Description                                      |
+|---------|----------------|-------|--------------------------------------------------|
+| install | --version      | -v    | Install specific version                         |
+|         | --set-active   |       | Set installed version as active (version manager)|
+|         | --all          | -a    | Install all packages                             |
+|         | --clean        | -c    | Force clean reinstallation                       |
+|         | --dry-run      | -d    | Preview install                                  |
+|         | --replace      | -r    | Remove existing version before install           |
+| remove  | --all          | -a    | Remove all packages                              |
+|         | --force        | -f    | Force removal of critical packages               |
+|         | --dry-run      | -d    | Preview removal                                  |
+| check   | --system       | -s    | Check system health                              |
+|         | --all          | -a    | Check all packages                               |
+|         | --list-versions| -l    | List all installed versions                      |
 
 ### **Install Packages**
 

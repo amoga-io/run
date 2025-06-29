@@ -155,7 +155,7 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			Name:              "essentials",
 			Description:       "System essentials and development tools",
 			ScriptPath:        "scripts/system/essentials.sh",
-			Dependencies:      []string{},
+			Dependencies:      []string{"gcc", "make", "redis-server", "pyenv", "nvm", "sdkman", "phpenv"},
 			Commands:          []string{"gcc", "make", "redis-server"},
 			Category:          "system",
 			VersionSupport:    false,

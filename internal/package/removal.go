@@ -279,6 +279,17 @@ func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, er
 		aptName = pkg.AptPackageName
 	}
 
+	// Block removal of python and python3 via APT
+	if aptName == "python" || aptName == "python3" {
+		result := &RemovalResult{
+			PackageName:      packageName,
+			InstallationType: InstallTypeAPT,
+			Success:          false,
+			Warning:          "Removal of system Python (python/python3) via APT is not allowed. This is critical for system operation.",
+		}
+		return result, nil
+	}
+
 	result := &RemovalResult{
 		PackageName:      packageName,
 		InstallationType: InstallTypeAPT,

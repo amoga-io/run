@@ -37,6 +37,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "3.10",
 			SupportedVersions: []string{"3.8", "3.9", "3.10", "3.11", "3.12"},
+			AptPackageName:    "", // Use only pyenv, not APT
 		},
 		"node": {
 			Name:              "node",
@@ -48,6 +49,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "18",
 			SupportedVersions: []string{"16", "18", "20", "21"},
+			AptPackageName:    "", // Use only nvm, not APT
 		},
 		"docker": {
 			Name:              "docker",
@@ -93,6 +95,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "8.3",
 			SupportedVersions: []string{"8.1", "8.2", "8.3"},
+			AptPackageName:    "", // Use only phpenv, not APT
 		},
 		"java": {
 			Name:              "java",
@@ -104,6 +107,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "17",
 			SupportedVersions: []string{"11", "17", "21"},
+			AptPackageName:    "", // Use only sdkman, not APT
 		},
 		"pm2": {
 			Name:              "pm2",

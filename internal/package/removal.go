@@ -153,8 +153,15 @@ func (m *Manager) detectInstallationType(packageName string) (InstallationType, 
 
 // isInstalledViaAPT checks if package is installed via APT
 func (m *Manager) isInstalledViaAPT(packageName string) bool {
+	// Use AptPackageName if present
+	pkg, exists := GetPackage(packageName)
+	aptName := packageName
+	if exists && pkg.AptPackageName != "" {
+		aptName = pkg.AptPackageName
+	}
+
 	// Special handling for docker
-	if packageName == "docker" {
+	if aptName == "docker" {
 		// Check if docker command exists
 		if !system.CommandExists("docker") {
 			return false
@@ -183,13 +190,13 @@ func (m *Manager) isInstalledViaAPT(packageName string) bool {
 	}
 
 	// Check dpkg -l
-	cmd := exec.Command("dpkg", "-l", packageName)
+	cmd := exec.Command("dpkg", "-l", aptName)
 	if err := cmd.Run(); err == nil {
 		return true
 	}
 
 	// Check apt-cache policy
-	cmd = exec.Command("apt-cache", "policy", packageName)
+	cmd = exec.Command("apt-cache", "policy", aptName)
 	output, err := cmd.Output()
 	if err == nil {
 		outputStr := string(output)
@@ -265,6 +272,13 @@ func (m *Manager) isInstalledViaAlternatives(packageName string) bool {
 
 // removeAPT removes a package installed via APT
 func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, error) {
+	// Use AptPackageName if present
+	pkg, exists := GetPackage(packageName)
+	aptName := packageName
+	if exists && pkg.AptPackageName != "" {
+		aptName = pkg.AptPackageName
+	}
+
 	result := &RemovalResult{
 		PackageName:      packageName,
 		InstallationType: InstallTypeAPT,
@@ -274,23 +288,23 @@ func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, er
 	if dryRun {
 		result.Success = true
 		result.RemovedPaths = []string{
-			fmt.Sprintf("APT package: %s", packageName),
+			fmt.Sprintf("APT package: %s", aptName),
 			"System-wide configuration files",
 		}
 		return result, nil
 	}
 
 	// Special handling for Docker
-	if packageName == "docker" {
+	if aptName == "docker" {
 		return m.removeDocker(dryRun)
 	}
 
 	// Show warning for system packages
-	fmt.Printf("⚠️  Removing APT package '%s' - this may affect system stability\n", packageName)
+	fmt.Printf("⚠️  Removing APT package '%s' - this may affect system stability\n", aptName)
 	fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
 
 	commands := [][]string{
-		{"sudo", "apt", "remove", "--purge", packageName, "-y"},
+		{"sudo", "apt", "remove", "--purge", aptName, "-y"},
 		{"sudo", "apt", "autoremove", "-y"},
 	}
 
@@ -309,7 +323,7 @@ func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, er
 
 	result.Success = true
 	result.RemovedPaths = []string{
-		fmt.Sprintf("APT package: %s", packageName),
+		fmt.Sprintf("APT package: %s", aptName),
 		"System-wide configuration files",
 	}
 

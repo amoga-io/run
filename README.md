@@ -49,9 +49,14 @@ run install <package> [<package> ...] [flags]
 #### Flags
 
 - `--version <ver>`: Install a specific version (e.g., 18 for node, 3.10 for python)
+- `--set-active`: Set the installed version as the active/default version in the version manager (for python, node, java, php)
 - `--all`: Install all available packages
 - `--clean`: Force clean reinstallation (remove existing first)
 - `--dry-run`: Show what would be installed, but do not actually install anything
+
+#### Version Manager Auto-Install
+
+When installing a version-managed package (python, node, java, php), the required version manager (`pyenv`, `nvm`, `sdkman`, `phpenv`) will be automatically installed if missing.
 
 #### Examples
 
@@ -62,6 +67,8 @@ run install node python docker
 run install --all
 run install node --clean  # Remove existing and install fresh
 run install node --dry-run # Preview installation
+run install python --version 3.10.5 --set-active # Install and set as active
+run install node --version 18.20.4 --set-active # Install and set as active
 ```
 
 ### **Remove Packages**

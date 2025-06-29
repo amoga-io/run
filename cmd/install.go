@@ -14,6 +14,7 @@ var (
 	installAll     bool
 	cleanInstall   bool
 	dryRunInstall  bool
+	setActive      bool
 )
 
 var installCmd = &cobra.Command{
@@ -32,10 +33,16 @@ Supported packages:
   • pm2         - Process manager for Node.js applications
   • essentials  - System essentials and development tools
 
+Version manager auto-install: When installing a version-managed package (python, node, java, php), the required version manager (pyenv, nvm, sdkman, phpenv) will be automatically installed if missing.
+
+--set-active flag: Use this flag to set the installed version as the active/default version in the version manager (for python, node, java, php).
+
 Examples:
   run install node python docker
   run install node --version 20
   run install python --version 3.10
+  run install python --version 3.10.5 --set-active
+  run install node --version 18.20.4 --set-active
   run install --all
   run install node --clean
   run install node --dry-run`,
@@ -48,6 +55,7 @@ func init() {
 	installCmd.Flags().BoolVar(&installAll, "all", false, "Install all available packages")
 	installCmd.Flags().BoolVar(&cleanInstall, "clean", false, "Force clean reinstallation (remove existing first)")
 	installCmd.Flags().BoolVar(&dryRunInstall, "dry-run", false, "Show what would be installed, but do not actually install anything")
+	installCmd.Flags().BoolVar(&setActive, "set-active", false, "Set the installed version as the active/default version after install")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
@@ -137,7 +145,17 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			if packageVersion != "" && pkg.SupportsVersion(packageName) {
 				fmt.Printf("🔍 DRY-RUN: Would install version %s\n", packageVersion)
 			}
+			if setActive {
+				fmt.Printf("🔍 DRY-RUN: Would set version %s as active for %s\n", packageVersion, packageName)
+			}
 			return nil // Skip actual installation in dry-run mode
+		}
+
+		// Auto-install version manager if needed
+		if pkg.SupportsVersion(packageName) {
+			if err := pkg.EnsureVersionManagerInstalled(packageName); err != nil {
+				return fmt.Errorf("failed to install required version manager for %s: %w", packageName, err)
+			}
 		}
 
 		// Handle clean installation
@@ -160,8 +178,19 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 		// Check if package supports version and version flag is provided
 		if pkg.SupportsVersion(packageName) && packageVersion != "" {
-			return manager.InstallPackageWithArgs(packageName, []string{"--version", packageVersion})
+			err := manager.InstallPackageWithArgs(packageName, []string{"--version", packageVersion})
+			if err != nil {
+				return err
+			}
+			if setActive {
+				if err := pkg.SetActiveVersion(packageName, packageVersion); err != nil {
+					return fmt.Errorf("failed to set %s version %s as active: %w", packageName, packageVersion, err)
+				}
+				fmt.Printf("✓ Set %s version %s as active\n", packageName, packageVersion)
+			}
+			return nil
 		}
+		// Default install
 		return manager.InstallPackageWithVersion(packageName, packageVersion)
 	}
 

@@ -270,3 +270,131 @@ func GetSystemVersion(packageName string) string {
 	}
 	return ""
 }
+
+// ListInstalledVersions returns all installed versions for a given package via its version manager
+func ListInstalledVersions(packageName string) ([]string, error) {
+	home := os.Getenv("HOME")
+	var versions []string
+
+	switch packageName {
+	case "python":
+		versionsPath := filepath.Join(home, ".pyenv/versions")
+		matches, _ := filepath.Glob(filepath.Join(versionsPath, "*"))
+		for _, match := range matches {
+			if info, err := os.Stat(match); err == nil && info.IsDir() {
+				versions = append(versions, filepath.Base(match))
+			}
+		}
+	case "node":
+		versionsPath := filepath.Join(home, ".nvm/versions/node")
+		matches, _ := filepath.Glob(filepath.Join(versionsPath, "*"))
+		for _, match := range matches {
+			if info, err := os.Stat(match); err == nil && info.IsDir() {
+				versions = append(versions, filepath.Base(match))
+			}
+		}
+	case "java":
+		candidatesPath := filepath.Join(home, ".sdkman/candidates/java")
+		matches, _ := filepath.Glob(filepath.Join(candidatesPath, "*"))
+		for _, match := range matches {
+			if info, err := os.Stat(match); err == nil && info.IsDir() {
+				versions = append(versions, filepath.Base(match))
+			}
+		}
+	case "php":
+		versionsPath := filepath.Join(home, ".phpenv/versions")
+		matches, _ := filepath.Glob(filepath.Join(versionsPath, "*"))
+		for _, match := range matches {
+			if info, err := os.Stat(match); err == nil && info.IsDir() {
+				versions = append(versions, filepath.Base(match))
+			}
+		}
+	}
+
+	if len(versions) == 0 {
+		return nil, fmt.Errorf("no versions found for %s", packageName)
+	}
+	return versions, nil
+}
+
+// CheckRequiredVersionManagers ensures all required version managers are installed
+func CheckRequiredVersionManagers() error {
+	required := []string{"pyenv", "nvm", "sdkman", "phpenv"}
+	missing := []string{}
+	for _, mgr := range required {
+		if !IsVersionManagerInstalled(mgr) {
+			missing = append(missing, mgr)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required version managers: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// EnsureVersionManagerInstalled checks if the required version manager for a package is installed, and installs it if missing
+func EnsureVersionManagerInstalled(packageName string) error {
+	// home := os.Getenv("HOME")
+	var managerName, installCmd string
+
+	switch packageName {
+	case "python":
+		managerName = "pyenv"
+		installCmd = "curl https://pyenv.run | bash"
+	case "node":
+		managerName = "nvm"
+		installCmd = "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
+	case "java":
+		managerName = "sdkman"
+		installCmd = "curl -s 'https://get.sdkman.io' | bash"
+	case "php":
+		managerName = "phpenv"
+		installCmd = "git clone https://github.com/phpenv/phpenv.git ~/.phpenv && git clone https://github.com/php-build/php-build.git ~/.phpenv/plugins/php-build"
+	default:
+		return nil // Not a version-managed package
+	}
+
+	if IsVersionManagerInstalled(managerName) {
+		return nil
+	}
+
+	// Install the version manager
+	fmt.Printf("Installing %s for %s...\n", managerName, packageName)
+	cmd := exec.Command("bash", "-c", installCmd)
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to install %s: %w", managerName, err)
+	}
+	return nil
+}
+
+// SetActiveVersion sets the specified version as the active/default version using the version manager
+func SetActiveVersion(packageName, version string) error {
+	var setCmd *exec.Cmd
+
+	switch packageName {
+	case "python":
+		home := os.Getenv("HOME")
+		setCmd = exec.Command("pyenv", "global", version)
+		setCmd.Env = append(os.Environ(), fmt.Sprintf("PYENV_ROOT=%s/.pyenv", home), fmt.Sprintf("PATH=%s/.pyenv/bin:%s", home, os.Getenv("PATH")))
+	case "node":
+		setCmd = exec.Command("bash", "-c", fmt.Sprintf("source $HOME/.nvm/nvm.sh && nvm alias default %s", version))
+	case "java":
+		setCmd = exec.Command("bash", "-c", fmt.Sprintf("source $HOME/.sdkman/bin/sdkman-init.sh && sdk default java %s", version))
+	case "php":
+		home := os.Getenv("HOME")
+		setCmd = exec.Command("phpenv", "global", version)
+		setCmd.Env = append(os.Environ(), fmt.Sprintf("PHPENV_ROOT=%s/.phpenv", home), fmt.Sprintf("PATH=%s/.phpenv/bin:%s", home, os.Getenv("PATH")))
+	default:
+		return fmt.Errorf("set-active not supported for %s", packageName)
+	}
+
+	setCmd.Stdout = os.Stdout
+	setCmd.Stderr = os.Stderr
+	if err := setCmd.Run(); err != nil {
+		return fmt.Errorf("failed to set %s version %s as active: %w", packageName, version, err)
+	}
+	return nil
+}

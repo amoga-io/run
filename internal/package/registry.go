@@ -15,6 +15,7 @@ type Package struct {
 	VersionSupport    bool     // Whether this package supports version selection
 	DefaultVersion    string   // Default version if not specified
 	SupportedVersions []string // List of supported versions
+	AptPackageName    string   // Name of the package in APT (if different from Name)
 }
 
 // Thread-safe package registry
@@ -80,6 +81,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "17",
 			SupportedVersions: []string{"15", "16", "17"},
+			AptPackageName:    "postgresql",
 		},
 		"php": {
 			Name:              "php",

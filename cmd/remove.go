@@ -37,9 +37,9 @@ Examples:
 }
 
 func init() {
-	removeCmd.Flags().BoolVar(&removeAll, "all", false, "Remove all available packages")
-	removeCmd.Flags().BoolVar(&forceRemove, "force", false, "Force removal of system-critical packages (DANGEROUS)")
-	removeCmd.Flags().BoolVar(&dryRunRemove, "dry-run", false, "Show what would be removed, but do not actually remove anything")
+	removeCmd.Flags().BoolVarP(&removeAll, "all", "a", false, "Remove all available packages")
+	removeCmd.Flags().BoolVarP(&forceRemove, "force", "f", false, "Force removal of system-critical packages (DANGEROUS)")
+	removeCmd.Flags().BoolVarP(&dryRunRemove, "dry-run", "d", false, "Show what would be removed, but do not actually remove anything")
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {

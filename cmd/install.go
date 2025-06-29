@@ -51,11 +51,11 @@ Examples:
 }
 
 func init() {
-	installCmd.Flags().StringVar(&packageVersion, "version", "", "Package version to install (e.g., 18 for node, 3.10 for python)")
-	installCmd.Flags().BoolVar(&installAll, "all", false, "Install all available packages")
-	installCmd.Flags().BoolVar(&cleanInstall, "clean", false, "Force clean reinstallation (remove existing first)")
-	installCmd.Flags().BoolVar(&dryRunInstall, "dry-run", false, "Show what would be installed, but do not actually install anything")
-	installCmd.Flags().BoolVar(&setActive, "set-active", false, "Set the installed version as the active/default version after install")
+	installCmd.Flags().StringVarP(&packageVersion, "version", "v", "", "Package version to install (e.g., 18 for node, 3.10 for python)")
+	installCmd.Flags().BoolVarP(&installAll, "all", "a", false, "Install all available packages")
+	installCmd.Flags().BoolVarP(&cleanInstall, "clean", "c", false, "Force clean reinstallation (remove existing first)")
+	installCmd.Flags().BoolVarP(&dryRunInstall, "dry-run", "d", false, "Show what would be installed, but do not actually install anything")
+	installCmd.Flags().BoolVarP(&setActive, "set-active", "s", false, "Set the installed version as the active/default version after install")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {

@@ -38,9 +38,9 @@ Examples:
 }
 
 func init() {
-	checkCmd.Flags().BoolVar(&checkSystemHealth, "system", false, "Check system health and requirements")
-	checkCmd.Flags().BoolVar(&checkAll, "all", false, "Check all available packages")
-	checkCmd.Flags().BoolVar(&listVersions, "list-versions", false, "List all installed versions for version-managed packages")
+	checkCmd.Flags().BoolVarP(&checkSystemHealth, "system", "s", false, "Check system health and requirements")
+	checkCmd.Flags().BoolVarP(&checkAll, "all", "a", false, "Check all available packages")
+	checkCmd.Flags().BoolVarP(&listVersions, "list-versions", "l", false, "List all installed versions for version-managed packages")
 }
 
 func runCheck(cmd *cobra.Command, args []string) error {

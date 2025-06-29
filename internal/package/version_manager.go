@@ -398,3 +398,86 @@ func SetActiveVersion(packageName, version string) error {
 	}
 	return nil
 }
+
+// EnsureVersionManagerInPath ensures the version manager is in the PATH, and prints a message if not
+func EnsureVersionManagerInPath(managerName string) {
+	home := os.Getenv("HOME")
+	path := os.Getenv("PATH")
+	var requiredPath string
+	var shellSnippet string
+
+	switch managerName {
+	case "pyenv":
+		requiredPath = filepath.Join(home, ".pyenv", "bin")
+		shellSnippet = "export PYENV_ROOT=\"$HOME/.pyenv\"\nexport PATH=\"$PYENV_ROOT/bin:$PATH\"\neval \"$(pyenv init --path)\"\neval \"$(pyenv virtualenv-init -)\""
+	case "nvm":
+		requiredPath = filepath.Join(home, ".nvm")
+		shellSnippet = "export NVM_DIR=\"$HOME/.nvm\"\n[ -s \"$NVM_DIR/nvm.sh\" ] && \\. \"$NVM_DIR/nvm.sh\""
+	case "sdkman":
+		requiredPath = filepath.Join(home, ".sdkman", "bin")
+		shellSnippet = "export SDKMAN_DIR=\"$HOME/.sdkman\"\nsource $SDKMAN_DIR/bin/sdkman-init.sh"
+	case "phpenv":
+		requiredPath = filepath.Join(home, ".phpenv", "bin")
+		shellSnippet = "export PHPENV_ROOT=\"$HOME/.phpenv\"\nexport PATH=\"$PHPENV_ROOT/bin:$PATH\"\neval \"$(phpenv init -)\""
+	}
+
+	if !strings.Contains(path, requiredPath) {
+		fmt.Printf("[INFO] %s was installed, but is not in your PATH. Please reload your shell or add the following to your ~/.bashrc or ~/.zshrc:\n%s\n", managerName, shellSnippet)
+	}
+}
+
+// UninstallExistingVersion uninstalls the currently installed version of a package (if any)
+func UninstallExistingVersion(packageName string) error {
+	home := os.Getenv("HOME")
+	var uninstallCmd *exec.Cmd
+
+	switch packageName {
+	case "python":
+		// Use pyenv to uninstall all versions except the requested one
+		versionsPath := filepath.Join(home, ".pyenv/versions")
+		matches, _ := filepath.Glob(filepath.Join(versionsPath, "*"))
+		for _, match := range matches {
+			ver := filepath.Base(match)
+			uninstallCmd = exec.Command("pyenv", "uninstall", "-f", ver)
+			uninstallCmd.Env = append(os.Environ(), fmt.Sprintf("PYENV_ROOT=%s/.pyenv", home), fmt.Sprintf("PATH=%s/.pyenv/bin:%s", home, os.Getenv("PATH")))
+			uninstallCmd.Stdout = os.Stdout
+			uninstallCmd.Stderr = os.Stderr
+			uninstallCmd.Run() // ignore errors for missing versions
+		}
+	case "node":
+		// Use nvm to uninstall all versions except the requested one
+		versionsPath := filepath.Join(home, ".nvm/versions/node")
+		matches, _ := filepath.Glob(filepath.Join(versionsPath, "*"))
+		for _, match := range matches {
+			ver := filepath.Base(match)
+			uninstallCmd = exec.Command("bash", "-c", fmt.Sprintf("source $HOME/.nvm/nvm.sh && nvm uninstall %s", ver))
+			uninstallCmd.Stdout = os.Stdout
+			uninstallCmd.Stderr = os.Stderr
+			uninstallCmd.Run()
+		}
+	case "java":
+		// Use sdkman to uninstall all versions except the requested one
+		candidatesPath := filepath.Join(home, ".sdkman/candidates/java")
+		matches, _ := filepath.Glob(filepath.Join(candidatesPath, "*"))
+		for _, match := range matches {
+			ver := filepath.Base(match)
+			uninstallCmd = exec.Command("bash", "-c", fmt.Sprintf("source $HOME/.sdkman/bin/sdkman-init.sh && sdk uninstall java %s", ver))
+			uninstallCmd.Stdout = os.Stdout
+			uninstallCmd.Stderr = os.Stderr
+			uninstallCmd.Run()
+		}
+	case "php":
+		// Use phpenv to uninstall all versions except the requested one
+		versionsPath := filepath.Join(home, ".phpenv/versions")
+		matches, _ := filepath.Glob(filepath.Join(versionsPath, "*"))
+		for _, match := range matches {
+			ver := filepath.Base(match)
+			uninstallCmd = exec.Command("phpenv", "uninstall", ver)
+			uninstallCmd.Env = append(os.Environ(), fmt.Sprintf("PHPENV_ROOT=%s/.phpenv", home), fmt.Sprintf("PATH=%s/.phpenv/bin:%s", home, os.Getenv("PATH")))
+			uninstallCmd.Stdout = os.Stdout
+			uninstallCmd.Stderr = os.Stderr
+			uninstallCmd.Run()
+		}
+	}
+	return nil
+}

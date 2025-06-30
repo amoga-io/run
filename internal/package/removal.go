@@ -6,9 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/amoga-io/run/internal/logger"
-	"github.com/amoga-io/run/internal/system"
 )
 
 // InstallationType represents how a package is installed
@@ -58,68 +55,42 @@ var criticalPackages = map[string]string{
 }
 
 // SafeRemovePackage safely removes a package with comprehensive safety checks
-func (m *Manager) SafeRemovePackage(packageName string, force bool, dryRun bool) (*RemovalResult, error) {
-	log := logger.GetLogger().WithOperation("safe_remove_package").WithPackage(packageName)
-
+func (m *Manager) SafeRemovePackage(packageName string, _ bool, dryRun bool) (*RemovalResult, error) {
 	result := &RemovalResult{
 		PackageName: packageName,
 		Success:     false,
 	}
 
-	// Check if package is critical
-	if isCritical, reason := m.isCriticalPackage(packageName); isCritical && !force {
-		result.Warning = fmt.Sprintf("Skipped removal of '%s' (system-critical: %s)", packageName, reason)
-		log.Warn("Skipped critical package removal: %s - %s", packageName, reason)
-		return result, nil
+	// Remove via APT
+	aptResult, _ := m.removeAPT(packageName, false, dryRun)
+	if aptResult != nil && (aptResult.Success || aptResult.Warning != "") {
+		result.RemovedPaths = append(result.RemovedPaths, aptResult.RemovedPaths...)
 	}
 
-	// Detect installation type
-	installType, err := m.detectInstallationType(packageName)
-	if err != nil {
-		result.Error = fmt.Errorf("failed to detect installation type: %w", err)
-		return result, result.Error
-	}
-	result.InstallationType = installType
-
-	log.Info("Detected installation type: %s for package: %s", installType, packageName)
-
-	// Perform removal based on installation type
-	switch installType {
-	case InstallTypeAPT:
-		return m.removeAPT(packageName, force, dryRun)
-	case InstallTypeManual:
-		return m.removeManual(packageName, dryRun)
-	case InstallTypeUser:
-		return m.removeUser(packageName, dryRun)
-	case InstallTypeVersion:
-		result.Warning = fmt.Sprintf("Package '%s' not found or not installed", packageName)
-		return result, nil
-	case InstallTypeAlternatives:
-		return m.removeAlternatives(packageName, force, dryRun)
-	case InstallTypeUnknown:
-		result.Warning = fmt.Sprintf("Package '%s' not found or not installed", packageName)
-		return result, nil
-	default:
-		result.Error = fmt.Errorf("unknown installation type: %s", installType)
-		return result, result.Error
-	}
-}
-
-// isCriticalPackage checks if a package is critical for system operation
-func (m *Manager) isCriticalPackage(packageName string) (bool, string) {
-	// Check exact match
-	if reason, exists := criticalPackages[packageName]; exists {
-		return true, reason
+	// Remove manual installs
+	manualResult, _ := m.removeManual(packageName, dryRun)
+	if manualResult != nil && (manualResult.Success || manualResult.Warning != "") {
+		result.RemovedPaths = append(result.RemovedPaths, manualResult.RemovedPaths...)
 	}
 
-	// Check prefix matches for critical packages
-	for critical, reason := range criticalPackages {
-		if strings.HasPrefix(packageName, critical) {
-			return true, reason
-		}
+	// Remove user installs
+	userResult, _ := m.removeUser(packageName, dryRun)
+	if userResult != nil && (userResult.Success || userResult.Warning != "") {
+		result.RemovedPaths = append(result.RemovedPaths, userResult.RemovedPaths...)
 	}
 
-	return false, ""
+	// Remove alternatives
+	altResult, _ := m.removeAlternatives(packageName, false, dryRun)
+	if altResult != nil && (altResult.Success || altResult.Warning != "") {
+		result.RemovedPaths = append(result.RemovedPaths, altResult.RemovedPaths...)
+	}
+
+	// Mark as success if any removal succeeded
+	if len(result.RemovedPaths) > 0 {
+		result.Success = true
+	}
+
+	return result, nil
 }
 
 // detectInstallationType detects how a package is installed
@@ -149,50 +120,14 @@ func (m *Manager) detectInstallationType(packageName string) (InstallationType, 
 
 // isInstalledViaAPT checks if package is installed via APT
 func (m *Manager) isInstalledViaAPT(packageName string) bool {
-	// Use AptPackageName if present
-	pkg, exists := GetPackage(packageName)
-	aptName := packageName
-	if exists && pkg.AptPackageName != "" {
-		aptName = pkg.AptPackageName
-	}
-
-	// Special handling for docker
-	if aptName == "docker" {
-		// Check if docker command exists
-		if !system.CommandExists("docker") {
-			return false
-		}
-
-		// Check multiple Docker packages
-		dockerPackages := []string{"docker-ce", "docker-ce-cli", "containerd.io", "docker.io"}
-		for _, pkg := range dockerPackages {
-			cmd := exec.Command("dpkg", "-l", pkg)
-			if err := cmd.Run(); err == nil {
-				return true
-			}
-		}
-
-		// Check apt-cache policy for any docker package
-		cmd := exec.Command("apt-cache", "policy", "docker-ce")
-		output, err := cmd.Output()
-		if err == nil {
-			outputStr := string(output)
-			if strings.Contains(outputStr, "Installed:") && !strings.Contains(outputStr, "(none)") {
-				return true
-			}
-		}
-
-		return false
-	}
-
 	// Check dpkg -l
-	cmd := exec.Command("dpkg", "-l", aptName)
+	cmd := exec.Command("dpkg", "-l", packageName)
 	if err := cmd.Run(); err == nil {
 		return true
 	}
 
 	// Check apt-cache policy
-	cmd = exec.Command("apt-cache", "policy", aptName)
+	cmd = exec.Command("apt-cache", "policy", packageName)
 	output, err := cmd.Output()
 	if err == nil {
 		outputStr := string(output)
@@ -297,29 +232,15 @@ func getInstalledAptPackagesMatching(pattern string) ([]string, error) {
 
 // removeAPT removes a package installed via APT
 func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*RemovalResult, error) {
-	pkg, exists := GetPackage(packageName)
-	aptName := packageName
-	if exists && pkg.AptPackageName != "" {
-		aptName = pkg.AptPackageName
+	result := &RemovalResult{
+		PackageName:      packageName,
+		InstallationType: InstallTypeAPT,
+		Success:          false,
 	}
-
-	// Block removal of python and python3 via APT
-	if aptName == "python" || aptName == "python3" || strings.HasPrefix(aptName, "python") {
-		result := &RemovalResult{
-			PackageName:      packageName,
-			InstallationType: InstallTypeAPT,
-			Success:          false,
-			Warning:          "Removal of system Python (python/python3) via APT is not allowed. This is critical for system operation.",
-		}
-		return result, nil
-	}
-
-	// Debug: show aptName
-	fmt.Printf("[DEBUG] aptName for removal: %s\n", aptName)
 
 	var pkgsToRemove []string
-	found, err := getInstalledAptPackagesMatching(aptName)
-	fmt.Printf("[DEBUG] getInstalledAptPackagesMatching(%s) -> %v\n", aptName, found)
+	found, err := getInstalledAptPackagesMatching(packageName)
+	fmt.Printf("[DEBUG] getInstalledAptPackagesMatching(%s) -> %v\n", packageName, found)
 	if err != nil {
 		fmt.Printf("[DEBUG] Error from getInstalledAptPackagesMatching: %v\n", err)
 	}
@@ -347,12 +268,6 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 
 	// Debug output
 	fmt.Printf("[DEBUG] Packages to remove for '%s': %v\n", packageName, pkgsToRemove)
-
-	result := &RemovalResult{
-		PackageName:      packageName,
-		InstallationType: InstallTypeAPT,
-		Success:          false,
-	}
 
 	if dryRun {
 		result.Success = true

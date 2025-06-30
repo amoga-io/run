@@ -15,7 +15,6 @@ type Package struct {
 	VersionSupport    bool     // Whether this package supports version selection
 	DefaultVersion    string   // Default version if not specified
 	SupportedVersions []string // List of supported versions
-	AptPackageName    string   // Name of the package in APT (if different from Name)
 }
 
 // Thread-safe package registry
@@ -37,7 +36,6 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "18",
 			SupportedVersions: []string{"16", "18", "20", "21"},
-			AptPackageName:    "nodejs",
 		},
 		"docker": {
 			Name:              "docker",
@@ -71,7 +69,6 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "17",
 			SupportedVersions: []string{"15", "16", "17"},
-			AptPackageName:    "postgresql",
 		},
 		"php": {
 			Name:              "php",
@@ -83,7 +80,6 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "8.3",
 			SupportedVersions: []string{"8.1", "8.2", "8.3"},
-			AptPackageName:    "php",
 		},
 		"java": {
 			Name:              "java",
@@ -95,7 +91,6 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "17",
 			SupportedVersions: []string{"11", "17", "21"},
-			AptPackageName:    "openjdk-17-jdk",
 		},
 		"pm2": {
 			Name:              "pm2",
@@ -107,7 +102,6 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "latest",
 			SupportedVersions: []string{"latest", "5.3.0", "5.4.0", "5.5.0"},
-			AptPackageName:    "pm2",
 		},
 		"essentials": {
 			Name:              "essentials",

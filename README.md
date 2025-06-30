@@ -51,7 +51,6 @@ run --help
 |         | --dry-run      | -d    | Preview install                                  |
 |         | --replace      | -r    | Remove existing version before install           |
 | remove  | --all          | -a    | Remove all packages                              |
-|         | --force        | -f    | Force removal of critical packages               |
 |         | --dry-run      | -d    | Preview removal                                  |
 | check   | --system       | -s    | Check system health                              |
 |         | --all          | -a    | Check all packages                               |
@@ -91,7 +90,6 @@ run remove <package> [<package> ...] [flags]
 
 #### Flags
 
-- `--force`: Force removal (bypass critical package protection)
 - `--dry-run`: Show what would be removed, but do not actually remove anything
 
 #### Examples
@@ -168,3 +166,7 @@ This command automatically appends the required environment variable setup for p
 ```bash
 run env-setup
 ```
+
+### **Note**
+
+Docker/Nginx are script-based only.

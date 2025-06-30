@@ -62,17 +62,12 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("Please specify a package to list versions for. Example: run install node --list-versions")
 		}
 		for _, packageName := range args {
-			pkgInfo, exists := pkg.GetPackage(packageName)
-			if !exists {
+			if _, exists := pkg.GetPackage(packageName); !exists {
 				fmt.Printf("Package '%s' not found.\n", packageName)
 				continue
 			}
-			aptName := pkgInfo.AptPackageName
-			if aptName == "" {
-				aptName = packageName
-			}
 			fmt.Printf("Available versions for %s (via apt):\n", packageName)
-			cmd := exec.Command("apt-cache", "madison", aptName)
+			cmd := exec.Command("apt-cache", "madison", packageName)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			cmd.Run()
@@ -167,16 +162,11 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 
 		// Always purge/remove existing versions before install
-		pkgInfo, exists := pkg.GetPackage(packageName)
-		if !exists {
+		if _, exists := pkg.GetPackage(packageName); !exists {
 			return fmt.Errorf("package '%s' not found", packageName)
 		}
-		aptName := pkgInfo.AptPackageName
-		if aptName == "" {
-			aptName = packageName
-		}
 		// Remove all installed versions (purge)
-		purgeCmd := exec.Command("sudo", "apt-get", "purge", "-y", aptName)
+		purgeCmd := exec.Command("sudo", "apt-get", "purge", "-y", packageName)
 		purgeCmd.Stdout = os.Stdout
 		purgeCmd.Stderr = os.Stderr
 		purgeCmd.Run() // Ignore errors if not installed
@@ -188,7 +178,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		// If version is specified, check if it's available
 		if packageVersion != "" && pkg.SupportsVersion(packageName) {
 			// Check if version is available in apt
-			checkCmd := exec.Command("apt-cache", "madison", aptName)
+			checkCmd := exec.Command("apt-cache", "madison", packageName)
 			output, err := checkCmd.Output()
 			if err != nil {
 				return fmt.Errorf("failed to check available versions for %s: %w", packageName, err)
@@ -205,7 +195,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("version %s of %s is not available in apt repositories", packageVersion, packageName)
 			}
 			// Install specific version
-			installCmd := exec.Command("sudo", "apt-get", "install", "-y", fmt.Sprintf("%s=%s*", aptName, packageVersion))
+			installCmd := exec.Command("sudo", "apt-get", "install", "-y", fmt.Sprintf("%s=%s*", packageName, packageVersion))
 			installCmd.Stdout = os.Stdout
 			installCmd.Stderr = os.Stderr
 			if err := installCmd.Run(); err != nil {
@@ -214,7 +204,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 		// Default install (latest)
-		installCmd := exec.Command("sudo", "apt-get", "install", "-y", aptName)
+		installCmd := exec.Command("sudo", "apt-get", "install", "-y", packageName)
 		installCmd.Stdout = os.Stdout
 		installCmd.Stderr = os.Stderr
 		if err := installCmd.Run(); err != nil {

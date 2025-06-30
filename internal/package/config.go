@@ -17,7 +17,6 @@ type PackageConfig struct {
 	VersionSupport    bool     `yaml:"version_support"`
 	DefaultVersion    string   `yaml:"default_version"`
 	SupportedVersions []string `yaml:"supported_versions"`
-	AptPackageName    string   `yaml:"apt_package_name"`
 }
 
 // ConfigManager manages package configurations
@@ -65,7 +64,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    true,
 			DefaultVersion:    "18",
 			SupportedVersions: []string{"16", "18", "20", "21"},
-			AptPackageName:    "nodejs",
 		},
 		"docker": {
 			Name:              "docker",
@@ -77,7 +75,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    false,
 			DefaultVersion:    "",
 			SupportedVersions: []string{},
-			AptPackageName:    "",
 		},
 		"nginx": {
 			Name:              "nginx",
@@ -89,7 +86,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    true,
 			DefaultVersion:    "stable",
 			SupportedVersions: []string{"stable", "mainline"},
-			AptPackageName:    "nginx",
 		},
 		"postgres": {
 			Name:              "postgres",
@@ -101,7 +97,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    true,
 			DefaultVersion:    "17",
 			SupportedVersions: []string{"15", "16", "17"},
-			AptPackageName:    "postgresql",
 		},
 		"php": {
 			Name:              "php",
@@ -113,7 +108,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    true,
 			DefaultVersion:    "8.3",
 			SupportedVersions: []string{"8.1", "8.2", "8.3"},
-			AptPackageName:    "php",
 		},
 		"java": {
 			Name:              "java",
@@ -125,7 +119,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    true,
 			DefaultVersion:    "17",
 			SupportedVersions: []string{"11", "17", "21"},
-			AptPackageName:    "openjdk-17-jdk",
 		},
 		"pm2": {
 			Name:              "pm2",
@@ -137,7 +130,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    true,
 			DefaultVersion:    "latest",
 			SupportedVersions: []string{"latest", "5.3.0", "5.4.0", "5.5.0"},
-			AptPackageName:    "pm2",
 		},
 		"essentials": {
 			Name:              "essentials",
@@ -149,7 +141,6 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			VersionSupport:    false,
 			DefaultVersion:    "",
 			SupportedVersions: []string{},
-			AptPackageName:    "",
 		},
 	}
 
@@ -214,6 +205,5 @@ func (pc PackageConfig) ConvertToPackage() Package {
 		VersionSupport:    pc.VersionSupport,
 		DefaultVersion:    pc.DefaultVersion,
 		SupportedVersions: pc.SupportedVersions,
-		AptPackageName:    pc.AptPackageName,
 	}
 }

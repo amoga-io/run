@@ -8,7 +8,6 @@ import (
 )
 
 var removeAll bool
-var forceRemove bool
 var dryRunRemove bool
 
 var removeCmd = &cobra.Command{
@@ -24,12 +23,11 @@ The remove command will:
 
 Safety features:
   • Critical system packages are protected by default
-  • Use --force to bypass critical package protection
   • Use --dry-run to preview what would be removed
 
 Examples:
   run remove node python
-  run remove docker --force
+  run remove docker
   run remove node --dry-run
   run remove --all`,
 	Args: cobra.ArbitraryArgs,
@@ -38,7 +36,6 @@ Examples:
 
 func init() {
 	removeCmd.Flags().BoolVarP(&removeAll, "all", "a", false, "Remove all available packages")
-	removeCmd.Flags().BoolVarP(&forceRemove, "force", "f", false, "Force removal of system-critical packages (DANGEROUS)")
 	removeCmd.Flags().BoolVarP(&dryRunRemove, "dry-run", "d", false, "Show what would be removed, but do not actually remove anything")
 }
 
@@ -83,7 +80,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	var results []*pkg.RemovalResult
 	for _, packageName := range packagesToRemove {
-		result, _ := manager.SafeRemovePackage(packageName, forceRemove, dryRunRemove)
+		result, _ := manager.SafeRemovePackage(packageName, false, dryRunRemove)
 		results = append(results, result)
 	}
 

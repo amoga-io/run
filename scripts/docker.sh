@@ -1,21 +1,5 @@
 #!/bin/bash
 
-DEFAULT_VERSION="latest"
-version="$DEFAULT_VERSION"
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --version)
-      shift
-      version="$1"
-      shift
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
 # Install dependencies
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
@@ -27,8 +11,8 @@ sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 # Add Docker repository
 echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Install Docker packages

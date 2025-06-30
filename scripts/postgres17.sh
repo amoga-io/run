@@ -1,21 +1,5 @@
 #!/bin/bash
 
-DEFAULT_VERSION=17
-version="$DEFAULT_VERSION"
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --version)
-      shift
-      version="$1"
-      shift
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
 # Generate random 20 character password
 POSTGRES_PASSWORD=$(openssl rand -base64 20 | tr -dc 'a-zA-Z0-9' | head -c 20)
 
@@ -29,23 +13,23 @@ sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] htt
 echo "Updating package lists..."
 sudo apt update
 
-# Install PostgreSQL
-echo "Installing PostgreSQL $version..."
-sudo apt install -y postgresql-$version
+# Install PostgreSQL 17
+echo "Installing PostgreSQL 17..."
+sudo apt install -y postgresql-17
 
 # Check PostgreSQL service status
 echo "Checking PostgreSQL service status..."
-sudo systemctl status postgresql@$version-main
+sudo systemctl status postgresql@17-main
 
 # Configure PostgreSQL to listen on all interfaces
 echo "Configuring PostgreSQL to listen on all interfaces..."
-sudo cp /etc/postgresql/$version/main/postgresql.conf /etc/postgresql/$version/main/postgresql.conf.backup
-sudo sh -c "echo \"listen_addresses = '*'\" >> /etc/postgresql/$version/main/postgresql.conf"
+sudo cp /etc/postgresql/17/main/postgresql.conf /etc/postgresql/17/main/postgresql.conf.backup
+sudo sh -c "echo \"listen_addresses = '*'\" >> /etc/postgresql/17/main/postgresql.conf"
 
 # Configure PostgreSQL to allow remote connections
 echo "Configuring PostgreSQL to allow remote connections..."
-sudo cp /etc/postgresql/$version/main/pg_hba.conf /etc/postgresql/$version/main/pg_hba.conf.backup
-sudo sh -c "echo \"host    all             all             0.0.0.0/0               scram-sha-256\" >> /etc/postgresql/$version/main/pg_hba.conf"
+sudo cp /etc/postgresql/17/main/pg_hba.conf /etc/postgresql/17/main/pg_hba.conf.backup
+sudo sh -c "echo \"host    all             all             0.0.0.0/0               scram-sha-256\" >> /etc/postgresql/17/main/pg_hba.conf"
 
 # Set postgres user password
 echo "Setting postgres user password..."
@@ -53,7 +37,7 @@ sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$POSTGRES_PASSWORD'
 
 # Restart PostgreSQL to apply changes
 echo "Restarting PostgreSQL service..."
-sudo systemctl restart postgresql@$version-main
+sudo systemctl restart postgresql@17-main
 
-echo "PostgreSQL $version installation complete."
+echo "PostgreSQL 17 installation complete."
 echo "Generated postgres user password: $POSTGRES_PASSWORD"

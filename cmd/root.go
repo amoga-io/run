@@ -1,5 +1,5 @@
 /*
-Copyright © 2025 Amoga
+Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 */
 package cmd
 
@@ -11,22 +11,24 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Ubuntu Server Package Manager",
-	Long: `A safe and intelligent CLI tool for managing developer and system packages on Ubuntu systems.
+	Use:   "devkit",
+	Short: "Devkit is a CLI tool to manage your development environment",
+	Long:  `Devkit is a command-line tool for managing development tools and packages using the apt package manager. It supports installing, removing, listing, and searching packages.`,
+	// Uncomment the following line if your bare application
+	// has an action associated with it:
+	Run: func(cmd *cobra.Command, args []string) {
+		// If no subcommand is provided, display help
+		if len(args) == 0 {
+			cmd.Help()
+			return
+		}
 
-Features:
-  • Install development tools (Node.js, Python, Java, PHP)
-  • Manage system services (Docker, Nginx, PostgreSQL)
-  • Version management for supported packages
-  • Automatic dependency resolution
-  • Safe package removal with rollback support
-
-Examples:
-  run install node docker
-  run install node --version 20
-  run check --all
-  run remove docker --force`,
+		// TODO: Implement correct version logic
+		if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
+			cmd.Println("Devkit version 1.0.0")
+			return
+		}
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -39,11 +41,6 @@ func Execute() {
 }
 
 func init() {
-	// Add all commands to root
-	rootCmd.AddCommand(updateCmd)
-	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(installCmd)
-	rootCmd.AddCommand(removeCmd)
-	rootCmd.AddCommand(checkCmd)
-	rootCmd.AddCommand(internalCmd)
+	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.Flags().BoolP("version", "v", false, "Display devkit version")
 }

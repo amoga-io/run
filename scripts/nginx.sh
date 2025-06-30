@@ -1,49 +1,14 @@
 #!/bin/bash
 
-DEFAULT_VERSION=mainline
-version="$DEFAULT_VERSION"
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --version)
-      shift
-      version="$1"
-      shift
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
-# Set non-interactive mode
-export DEBIAN_FRONTEND=noninteractive
-
-# Function to retry commands
-retry() {
-  local n=0
-  until [ $n -ge 5 ]; do
-    "$@" && break
-    n=$((n+1))
-    echo "Command failed, retrying... ($n/5)"
-    sleep 2
-  done
-}
-
 # Add Nginx official repository
-echo "Adding Nginx repository..."
-echo "deb [arch=amd64] http://nginx.org/packages/$version/ubuntu/ $(lsb_release -cs) nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
+echo "deb [arch=amd64] http://nginx.org/packages/mainline/ubuntu/ $(lsb_release -cs) nginx" | sudo tee /etc/apt/sources.list.d/nginx.list
 
-# Add Nginx signing key (force overwrite)
-echo "Adding Nginx signing key..."
+# Add Nginx signing key
 curl -fsSL https://nginx.org/keys/nginx_signing.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/nginx.gpg
 
 # Install nginx
-echo "Installing Nginx..."
-retry sudo apt update -qq
-retry sudo apt install -y -qq nginx \
-  -o Dpkg::Options::="--force-confdef" \
-  -o Dpkg::Options::="--force-confold"
+sudo apt update
+sudo apt install -y nginx
 
 # Create required directories
 sudo mkdir -p /var/run/nginx
@@ -74,7 +39,7 @@ echo "server { listen 80 default_server; listen [::]:80 default_server; server_n
 sudo chown $USER:$USER /etc/nginx/nginx.conf
 sudo chown -R $USER:$USER /etc/nginx/conf.d
 
-# Test configuration
+# Test onfiguration
 nginx -t
 
 # Start nginx

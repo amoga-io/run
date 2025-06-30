@@ -12,10 +12,10 @@ import (
 // updateCmd represents the update command
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update the devkit CLI tool",
-	Long:  `Update the devkit CLI tool to the latest version. This command will check for updates and apply them if available.`,
+	Short: "Update the run CLI tool",
+	Long:  `Update the run CLI tool to the latest version. This command will check for updates and apply them if available.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Not implemented yet. This command will update the devkit CLI tool to the latest version.")
+		fmt.Println("Not implemented yet. This command will update the run CLI tool to the latest version.")
 	},
 }
 

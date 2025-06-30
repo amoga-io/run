@@ -11,9 +11,9 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "devkit",
-	Short: "Devkit is a CLI tool to manage your development environment",
-	Long:  `Devkit is a command-line tool for managing development tools and packages using the apt package manager. It supports installing, removing, listing, and searching packages.`,
+	Use:   "run",
+	Short: "Run is a CLI tool to manage your development environment",
+	Long:  `Run is a command-line tool for managing development tools and packages using the apt package manager. It supports installing, removing, listing, and searching packages.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
@@ -25,7 +25,7 @@ var rootCmd = &cobra.Command{
 
 		// TODO: Implement correct version logic
 		if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
-			cmd.Println("Devkit version 1.0.0")
+			cmd.Println("Run version 1.0.0")
 			return
 		}
 	},
@@ -42,5 +42,5 @@ func Execute() {
 
 func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	rootCmd.Flags().BoolP("version", "v", false, "Display devkit version")
+	rootCmd.Flags().BoolP("version", "v", false, "Display run version")
 }

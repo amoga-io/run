@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-var CLIName = "devkit"
+var CLIName = "run"
 
 func getScriptName(command, packageName string) (string, bool) {
 	if command == "install" {

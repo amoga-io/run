@@ -14,7 +14,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all available packages",
-	Long:  `List all available packages that can be installed using devkit.`,
+	Long:  `List all available packages that can be installed using run.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		for packageName := range internal.InstallPackageRegistry {
 			fmt.Println(packageName)

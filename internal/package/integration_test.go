@@ -53,7 +53,7 @@ func TestPackageLifecycle(t *testing.T) {
 // testPackageValidation tests package validation functionality
 func testPackageValidation(t *testing.T, manager *Manager) {
 	// Test valid packages
-	validPackages := []string{"python", "node", "docker", "essentials"}
+	validPackages := []string{"node", "docker", "essentials"}
 	for _, pkgName := range validPackages {
 		pkg, err := manager.validatePackage(pkgName)
 		if err != nil {
@@ -137,7 +137,7 @@ func TestSequentialOperations(t *testing.T) {
 	defer CleanupMockManager(suite.manager)
 
 	// Test sequential execution setup
-	packages := []string{"python", "node", "docker"}
+	packages := []string{"node", "docker"}
 
 	// Create a simple operation function for testing
 	testOperation := func(packageName string) error {
@@ -230,7 +230,7 @@ func TestOutputInterface(t *testing.T) {
 	consoleOutput.Section("Test Section")
 
 	// Test summary
-	successful := []string{"python", "node"}
+	successful := []string{"node"}
 	failed := []string{"docker"}
 	consoleOutput.Summary("test", successful, failed, 3, "run test")
 

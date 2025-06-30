@@ -46,4 +46,5 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(internalCmd)
+	rootCmd.AddCommand(envSetupCmd)
 }

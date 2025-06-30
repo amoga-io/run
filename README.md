@@ -56,6 +56,7 @@ run --help
 | check   | --system       | -s    | Check system health                              |
 |         | --all          | -a    | Check all packages                               |
 |         | --list-versions| -l    | List all installed versions                      |
+| env-setup |                |       | Set up environment for version managers and reload shell |
 
 ### **Install Packages**
 
@@ -160,3 +161,17 @@ run check --help
 2. **Register Command** in `cmd/root.go`
 3. **Add Tests** for the new command
 4. **Update Help Documentation**
+
+### **Environment Setup**
+
+```bash
+run env-setup
+```
+
+This command automatically appends the required environment variable setup for pyenv, nvm, sdkman, and phpenv to your shell config (`.bashrc` or `.zshrc`) and reloads the shell. Use this after installing any version manager or if you want to ensure your environment is ready for version-managed packages.
+
+#### Example
+
+```bash
+run env-setup
+```

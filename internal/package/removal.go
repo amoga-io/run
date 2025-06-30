@@ -86,7 +86,7 @@ func (m *Manager) SafeRemovePackage(packageName string, force bool, dryRun bool)
 	// Perform removal based on installation type
 	switch installType {
 	case InstallTypeAPT:
-		return m.removeAPT(packageName, dryRun)
+		return m.removeAPT(packageName, force, dryRun)
 	case InstallTypeManual:
 		return m.removeManual(packageName, dryRun)
 	case InstallTypeUser:
@@ -94,7 +94,7 @@ func (m *Manager) SafeRemovePackage(packageName string, force bool, dryRun bool)
 	case InstallTypeVersion:
 		return m.removeVersionManager(packageName, dryRun)
 	case InstallTypeAlternatives:
-		return m.removeAlternatives(packageName, dryRun)
+		return m.removeAlternatives(packageName, force, dryRun)
 	case InstallTypeUnknown:
 		result.Warning = fmt.Sprintf("Package '%s' not found or not installed", packageName)
 		return result, nil
@@ -271,7 +271,7 @@ func (m *Manager) isInstalledViaAlternatives(packageName string) bool {
 }
 
 // removeAPT removes a package installed via APT
-func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, error) {
+func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*RemovalResult, error) {
 	// Use AptPackageName if present
 	pkg, exists := GetPackage(packageName)
 	aptName := packageName
@@ -311,8 +311,10 @@ func (m *Manager) removeAPT(packageName string, dryRun bool) (*RemovalResult, er
 	}
 
 	// Show warning for system packages
-	fmt.Printf("⚠️  Removing APT package '%s' - this may affect system stability\n", aptName)
-	fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
+	if !force {
+		fmt.Printf("\u26a0\ufe0f  Removing APT package '%s' - this may affect system stability\n", aptName)
+		fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
+	}
 
 	commands := [][]string{
 		{"sudo", "apt", "remove", "--purge", aptName, "-y"},
@@ -571,7 +573,7 @@ func (m *Manager) removeVersionManager(packageName string, dryRun bool) (*Remova
 }
 
 // removeAlternatives removes a package installed via alternatives
-func (m *Manager) removeAlternatives(packageName string, dryRun bool) (*RemovalResult, error) {
+func (m *Manager) removeAlternatives(packageName string, force bool, dryRun bool) (*RemovalResult, error) {
 	result := &RemovalResult{
 		PackageName:      packageName,
 		InstallationType: InstallTypeAlternatives,
@@ -587,8 +589,10 @@ func (m *Manager) removeAlternatives(packageName string, dryRun bool) (*RemovalR
 	}
 
 	// Show warning for alternatives packages
-	fmt.Printf("⚠️  Removing alternatives configuration for '%s' - this may affect system stability\n", packageName)
-	fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
+	if !force {
+		fmt.Printf("\u26a0\ufe0f  Removing alternatives configuration for '%s' - this may affect system stability\n", packageName)
+		fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
+	}
 
 	// Remove the alternatives configuration
 	cmd := exec.Command("sudo", "update-alternatives", "--remove-all", packageName)

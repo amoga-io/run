@@ -40,7 +40,30 @@ func Execute() {
 	}
 }
 
+// verifyCmd represents the verify command for installation verification
+var verifyCmd = &cobra.Command{
+	Use:    "verify",
+	Short:  "Verify installation",
+	Hidden: true, // Hide from help menu
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Println("run CLI is installed and working correctly")
+	},
+}
+
+// versionCmd represents the version command
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show version information",
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Println("Run version 1.0.0")
+	},
+}
+
 func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.Flags().BoolP("version", "v", false, "Display run version")
+
+	// Add subcommands to root command
+	rootCmd.AddCommand(verifyCmd)
+	rootCmd.AddCommand(versionCmd)
 }

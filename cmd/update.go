@@ -265,10 +265,16 @@ func getCommitInfo() string {
 
 // getCurrentVersion gets the current version of the installed binary
 func getCurrentVersion() string {
-	versionCmd := exec.Command("run", "--version")
+	// Try version command first
+	versionCmd := exec.Command("run", "version")
 	versionOutput, err := versionCmd.Output()
 	if err != nil {
-		return ""
+		// Try --version flag as fallback
+		versionCmd = exec.Command("run", "--version")
+		versionOutput, err = versionCmd.Output()
+		if err != nil {
+			return "unknown"
+		}
 	}
 	return strings.TrimSpace(string(versionOutput))
 }

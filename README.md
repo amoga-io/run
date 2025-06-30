@@ -32,141 +32,76 @@ sudo rm -f /usr/local/bin/run
 rm -rf ~/.run
 ```
 
-## 📖 CLI Usage Guide
+## 📁 Project Structure
 
-### **General Help**
-
-```bash
-run --help
+```
+run/
+├── cmd/                          # CLI commands
+│   ├── install.go               # Install command implementation
+│   ├── remove.go                # Remove command implementation
+│   ├── list.go                  # List command implementation
+│   ├── update.go                # Update command implementation
+│   └── root.go                  # Root CLI setup
+├── internal/                     # Internal packages
+│   ├── registry.go              # Package registry and definitions
+│   ├── scriptPath.go            # Script path resolution
+│   └── utils.go                 # Utility functions
+├── scripts/                     # Installation scripts
+│   ├── docker.sh                # Docker installation
+│   ├── essentials.sh            # Essential tools installation
+│   ├── install.sh               # CLI installation script
+│   ├── java.sh                  # Java installation
+│   ├── nginx.sh                 # Nginx installation
+│   ├── node.sh                  # Node.js installation
+│   ├── php.sh                   # PHP installation
+│   ├── pm2.sh                   # PM2 installation
+│   ├── postgres17.sh            # PostgreSQL 17 installation
+│   ├── python.sh                # Python installation
+│   ├── remove-nginx.sh          # Nginx removal
+│   ├── remove-node.sh           # Node.js removal
+│   └── remove-postgres.sh       # PostgreSQL removal
+├── go.mod                       # Go module definition
+├── go.sum                       # Go module checksums
+├── main.go                      # Application entry point
+├── README.md                    # Project documentation
+└── run                          # Compiled binary
 ```
 
-## CLI Flags Summary Table
+## How to Add New Packages
 
-| Command | Flag           | Alias | Description                                      |
-|---------|----------------|-------|--------------------------------------------------|
-| install | --version      | -v    | Install specific version                         |
-|         | --set-active   |       | Set installed version as active (version manager)|
-|         | --all          | -a    | Install all packages                             |
-|         | --clean        | -c    | Force clean reinstallation                       |
-|         | --dry-run      | -d    | Preview install                                  |
-|         | --replace      | -r    | Remove existing version before install           |
-| remove  | --all          | -a    | Remove all packages                              |
-|         | --dry-run      | -d    | Preview removal                                  |
-| check   | --system       | -s    | Check system health                              |
-|         | --all          | -a    | Check all packages                               |
-|         | --list-versions| -l    | List all installed versions                      |
-| env-setup |                |       | Set up environment for version managers and reload shell |
-
-### **Install Packages**
-
+### 1. Create Installation Script
+Create a new script in `scripts/` directory:
 ```bash
-run install <package> [<package> ...] [flags]
+# scripts/redis.sh
+#!/bin/bash
+echo "Installing Redis..."
+# Installation logic here
 ```
 
-#### Flags
-
-- `--version <ver>`: Install a specific version (e.g., 18 for node, 8.3 for php)
-- `--all`: Install all available packages
-- `--clean`: Force clean reinstallation (remove existing first)
-- `--dry-run`: Show what would be installed, but do not actually install anything
-
-#### Examples
-
-```bash
-run install node
-run install php --version 8.3
-run install node docker
-run install --all
-run install node --clean  # Remove existing and install fresh
-run install node --dry-run # Preview installation
-run install java --version 17 # Install specific Java version
+### 2. Map Script in Registry
+Add package mapping in `internal/registry.go`:
+```go
+var InstallPackageRegistry = map[string]string{
+    "redis": "redis.sh",
+    // ...existing mappings
+}
 ```
 
-### **Remove Packages**
-
+### 3. Add Removal Script (Optional)
+Create removal script:
 ```bash
-run remove <package> [<package> ...] [flags]
+# scripts/remove-redis.sh
+#!/bin/bash
+echo "Removing Redis..."
+# Removal logic here
 ```
 
-#### Flags
-
-- `--dry-run`: Show what would be removed, but do not actually remove anything
-
-#### Examples
-
-```bash
-run remove node
-run remove node docker
-run remove node --dry-run # Preview removal
+### 4. Map Removal Script
+Add to removal registry in `internal/registry.go`:
+```go
+var RemovePackageRegistry = map[string]string{
+    "redis": "remove-redis.sh",
+    // ...existing mappings
+}
 ```
 
-### **Check Package Status**
-
-```bash
-run check <package> [<package> ...]
-```
-
-#### Examples
-
-```bash
-run check node docker
-run check all
-```
-
-### **List Available Packages**
-
-```bash
-run install list
-```
-
-### **Update System**
-
-```bash
-run update
-```
-
-### **Show Version**
-
-```bash
-run version
-```
-
-### **Command-Specific Help**
-
-```bash
-run install --help
-run remove --help
-run check --help
-```
-
-### **Adding New Packages**
-
-1. **Add Package Definition** in `internal/package/registry.go`
-2. **Create Installation Script** in `scripts/packages/`
-3. **Add Tests** in `internal/package/manager_test.go`
-4. **Update Documentation** in this README
-
-### **Adding New Commands**
-
-1. **Create Command File** in `cmd/` directory
-2. **Register Command** in `cmd/root.go`
-3. **Add Tests** for the new command
-4. **Update Help Documentation**
-
-### **Environment Setup**
-
-```bash
-run env-setup
-```
-
-This command automatically appends the required environment variable setup for pyenv, nvm, sdkman, and phpenv to your shell config (`.bashrc` or `.zshrc`) and reloads the shell. Use this after installing any version manager or if you want to ensure your environment is ready for version-managed packages.
-
-#### Example
-
-```bash
-run env-setup
-```
-
-### **Note**
-
-Docker/Nginx are script-based only.

@@ -6,8 +6,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/amoga-io/run/internal"
 	"github.com/spf13/cobra"
-	"github.com/ssk-amoga/devkit/internal"
 )
 
 // removeCmd represents the remove command

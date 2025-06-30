@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/amoga-io/run/internal"
 	"github.com/spf13/cobra"
-	"github.com/ssk-amoga/devkit/internal"
 )
 
 // installCmd represents the install command

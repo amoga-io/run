@@ -49,7 +49,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "18",
 			SupportedVersions: []string{"16", "18", "20", "21"},
-			AptPackageName:    "", // Use only nvm, not APT
+			AptPackageName:    "nodejs", // Use only nvm, not APT
 		},
 		"docker": {
 			Name:              "docker",

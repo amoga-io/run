@@ -99,7 +99,61 @@ func (m *Manager) InstallPackageWithVersion(packageName string, targetVersion st
 		return nil // Package already installed with same version
 	}
 
-	return m.executeInstallation(pkg, rollbackPoint)
+	// Special logic for Docker: always use script
+	if pkg.Name == "docker" {
+		fmt.Println("[DEBUG] Installing Docker using script (not available on APT)")
+		return m.executeInstallScript(pkg)
+	}
+
+	// Special logic for Node.js: prefer APT if available
+	if pkg.Name == "node" {
+		fmt.Println("[DEBUG] Checking if 'nodejs' is available on APT...")
+		aptPolicyCmd := exec.Command("apt-cache", "policy", "nodejs")
+		aptPolicyOut, err := aptPolicyCmd.Output()
+		if err == nil && strings.Contains(string(aptPolicyOut), "Candidate:") && !strings.Contains(string(aptPolicyOut), "Candidate: (none)") {
+			fmt.Println("[DEBUG] 'nodejs' is available on APT.")
+			if targetVersion != "" {
+				fmt.Printf("[DEBUG] Checking if version %s is available for nodejs on APT...\n", targetVersion)
+				madisonCmd := exec.Command("apt-cache", "madison", "nodejs")
+				madisonOut, err := madisonCmd.Output()
+				if err != nil {
+					return fmt.Errorf("failed to check available versions for nodejs: %w", err)
+				}
+				available := false
+				lines := strings.Split(string(madisonOut), "\n")
+				for _, line := range lines {
+					if strings.Contains(line, targetVersion) {
+						available = true
+						break
+					}
+				}
+				if !available {
+					return fmt.Errorf("version %s of nodejs is not available in apt repositories", targetVersion)
+				}
+				fmt.Printf("[DEBUG] Installing nodejs version %s via APT...\n", targetVersion)
+				installCmd := exec.Command("sudo", "apt-get", "install", "-y", fmt.Sprintf("nodejs=%s*", targetVersion))
+				installCmd.Stdout = os.Stdout
+				installCmd.Stderr = os.Stderr
+				if err := installCmd.Run(); err != nil {
+					return fmt.Errorf("failed to install nodejs version %s: %w", targetVersion, err)
+				}
+				return nil
+			}
+			fmt.Println("[DEBUG] Installing latest nodejs via APT...")
+			installCmd := exec.Command("sudo", "apt-get", "install", "-y", "nodejs")
+			installCmd.Stdout = os.Stdout
+			installCmd.Stderr = os.Stderr
+			if err := installCmd.Run(); err != nil {
+				return fmt.Errorf("failed to install nodejs: %w", err)
+			}
+			return nil
+		}
+		fmt.Println("[DEBUG] 'nodejs' is not available on APT, falling back to script.")
+		return m.executeInstallScript(pkg)
+	}
+
+	// Default: use script for all other packages
+	return m.executeInstallScript(pkg)
 }
 
 // validatePackage validates and retrieves package information

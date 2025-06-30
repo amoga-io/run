@@ -314,13 +314,35 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 		return result, nil
 	}
 
+	// Debug: show aptName
+	fmt.Printf("[DEBUG] aptName for removal: %s\n", aptName)
+
 	var pkgsToRemove []string
 	found, err := getInstalledAptPackagesMatching(aptName)
-	if err == nil && len(found) > 0 {
+	fmt.Printf("[DEBUG] getInstalledAptPackagesMatching(%s) -> %v\n", aptName, found)
+	if err != nil {
+		fmt.Printf("[DEBUG] Error from getInstalledAptPackagesMatching: %v\n", err)
+	}
+	if len(found) > 0 {
 		pkgsToRemove = found
 	}
 	if len(pkgsToRemove) == 0 {
-		pkgsToRemove = []string{aptName}
+		// Show what dpkg -l | grep postgresql returns
+		cmd := exec.Command("bash", "-c", "dpkg -l | grep postgresql")
+		out, _ := cmd.Output()
+		fmt.Printf("[DEBUG] dpkg -l | grep postgresql:\n%s\n", string(out))
+		// Fallback: try to remove all postgresql-* packages if any are present
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 && strings.HasPrefix(fields[1], "postgresql") {
+				pkgsToRemove = append(pkgsToRemove, fields[1])
+			}
+		}
+	}
+
+	if len(pkgsToRemove) == 0 {
+		fmt.Printf("[DEBUG] No postgresql packages found for removal.\n")
 	}
 
 	// Debug output

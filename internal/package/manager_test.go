@@ -9,7 +9,7 @@ func TestNewManager(t *testing.T) {
 	// Set testing environment variable
 	os.Setenv("TESTING", "true")
 	defer os.Unsetenv("TESTING")
-	
+
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -28,7 +28,7 @@ func TestValidatePackage(t *testing.T) {
 	// Set testing environment variable
 	os.Setenv("TESTING", "true")
 	defer os.Unsetenv("TESTING")
-	
+
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -55,7 +55,7 @@ func TestIsPackageInstalled(t *testing.T) {
 	// Set testing environment variable
 	os.Setenv("TESTING", "true")
 	defer os.Unsetenv("TESTING")
-	
+
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -86,7 +86,7 @@ func TestGetSystemVersion(t *testing.T) {
 	// Set testing environment variable
 	os.Setenv("TESTING", "true")
 	defer os.Unsetenv("TESTING")
-	
+
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)

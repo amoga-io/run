@@ -598,6 +598,42 @@ func (m *Manager) RemovePackage(packageName string) error {
 
 // GetSystemVersion gets the system-installed version of a package
 func (m *Manager) GetSystemVersion(packageName string) string {
-	// Use the centralized version manager utility
-	return GetSystemVersion(packageName)
+	// Try to get the version using the package's command (e.g., node --version, php -v, java -version, etc.)
+	switch packageName {
+	case "node":
+		if out, err := exec.Command("node", "--version").Output(); err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	case "php":
+		if out, err := exec.Command("php", "-v").Output(); err == nil {
+			lines := strings.Split(string(out), "\n")
+			if len(lines) > 0 {
+				return lines[0]
+			}
+		}
+	case "java":
+		if out, err := exec.Command("java", "-version").CombinedOutput(); err == nil {
+			lines := strings.Split(string(out), "\n")
+			if len(lines) > 0 {
+				return lines[0]
+			}
+		}
+	case "docker":
+		if out, err := exec.Command("docker", "--version").Output(); err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	case "nginx":
+		if out, err := exec.Command("nginx", "-v").CombinedOutput(); err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	case "postgres":
+		if out, err := exec.Command("psql", "--version").Output(); err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	case "pm2":
+		if out, err := exec.Command("pm2", "--version").Output(); err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	}
+	return ""
 }

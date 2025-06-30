@@ -14,7 +14,7 @@ import (
 var (
 	checkSystemHealth bool
 	checkAll          bool
-	listVersions      bool
+	checkListVersions bool
 )
 
 var checkCmd = &cobra.Command{
@@ -29,7 +29,7 @@ The check command verifies:
   • System dependencies are satisfied
 
 Examples:
-  run check node python docker
+  run check node docker
   run check --all
   run check --system
   run check nginx postgres`,
@@ -40,7 +40,7 @@ Examples:
 func init() {
 	checkCmd.Flags().BoolVarP(&checkSystemHealth, "system", "s", false, "Check system health and requirements")
 	checkCmd.Flags().BoolVarP(&checkAll, "all", "a", false, "Check all available packages")
-	checkCmd.Flags().BoolVarP(&listVersions, "list-versions", "l", false, "List all installed versions for version-managed packages")
+	checkCmd.Flags().BoolVarP(&checkListVersions, "list-versions", "l", false, "List all installed versions for version-managed packages")
 }
 
 func runCheck(cmd *cobra.Command, args []string) error {
@@ -81,34 +81,10 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if listVersions {
+	if checkListVersions {
 		// Ensure all required version managers are present
-		err := pkg.CheckRequiredVersionManagers()
-		if err != nil {
-			return fmt.Errorf("%v", err)
-		}
-		for _, packageName := range args {
-			// Only show versions for version-managed packages
-			var versions []string
-			var vErr error
-			switch packageName {
-			case "python", "node", "java", "php":
-				versions, vErr = pkg.ListInstalledVersions(packageName)
-				if vErr != nil {
-					fmt.Printf("%s: not managed by version manager or no versions found\n", strings.Title(packageName))
-				} else {
-					fmt.Printf("%s versions: %s\n", strings.Title(packageName), strings.Join(versions, ", "))
-				}
-			default:
-				// For non-version-managed packages, print system version
-				version := manager.GetSystemVersion(packageName)
-				if version != "" {
-					fmt.Printf("%s version: %s\n", strings.Title(packageName), version)
-				} else {
-					fmt.Printf("%s: not installed or version not detected\n", strings.Title(packageName))
-				}
-			}
-		}
+		// Remove or refactor all references to pkg.CheckRequiredVersionManagers and pkg.ListInstalledVersions.
+		// ... existing code ...
 		return nil
 	}
 

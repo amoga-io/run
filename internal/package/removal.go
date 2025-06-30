@@ -92,7 +92,8 @@ func (m *Manager) SafeRemovePackage(packageName string, force bool, dryRun bool)
 	case InstallTypeUser:
 		return m.removeUser(packageName, dryRun)
 	case InstallTypeVersion:
-		return m.removeVersionManager(packageName, dryRun)
+		result.Warning = fmt.Sprintf("Package '%s' not found or not installed", packageName)
+		return result, nil
 	case InstallTypeAlternatives:
 		return m.removeAlternatives(packageName, force, dryRun)
 	case InstallTypeUnknown:
@@ -131,11 +132,6 @@ func (m *Manager) detectInstallationType(packageName string) (InstallationType, 
 	// Check if installed manually in /usr/local
 	if m.isInstalledManually(packageName) {
 		return InstallTypeManual, nil
-	}
-
-	// Check if installed via version manager
-	if m.isInstalledViaVersionManager(packageName) {
-		return InstallTypeVersion, nil
 	}
 
 	// Check if installed in user directory
@@ -227,11 +223,6 @@ func (m *Manager) isInstalledManually(packageName string) bool {
 	return false
 }
 
-// isInstalledViaVersionManager checks if package is installed via version manager
-func (m *Manager) isInstalledViaVersionManager(packageName string) bool {
-	return IsPackageInstalledViaVersionManager(packageName)
-}
-
 // isInstalledInUserDir checks if package is installed in user directory
 func (m *Manager) isInstalledInUserDir(packageName string) bool {
 	home := os.Getenv("HOME")
@@ -272,6 +263,23 @@ func (m *Manager) isInstalledViaAlternatives(packageName string) bool {
 
 // getInstalledAptPackagesMatching returns a list of installed APT packages matching a pattern (e.g., "php", "postgresql", "nginx")
 func getInstalledAptPackagesMatching(pattern string) ([]string, error) {
+	// Special handling for postgres: match postgresql-*
+	if pattern == "postgresql" {
+		cmd := exec.Command("bash", "-c", "dpkg -l | grep '^ii' | awk '{print $2}' | grep '^postgresql'")
+		output, err := cmd.Output()
+		if err != nil {
+			return nil, err
+		}
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		var pkgs []string
+		for _, line := range lines {
+			if line != "" {
+				pkgs = append(pkgs, line)
+			}
+		}
+		return pkgs, nil
+	}
+	// Default logic
 	cmd := exec.Command("bash", "-c", "dpkg -l | grep '^ii' | awk '{print $2}' | grep '^"+pattern+"'")
 	output, err := cmd.Output()
 	if err != nil {
@@ -289,7 +297,6 @@ func getInstalledAptPackagesMatching(pattern string) ([]string, error) {
 
 // removeAPT removes a package installed via APT
 func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*RemovalResult, error) {
-	// Use AptPackageName if present
 	pkg, exists := GetPackage(packageName)
 	aptName := packageName
 	if exists && pkg.AptPackageName != "" {
@@ -307,16 +314,17 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 		return result, nil
 	}
 
-	// For all other packages, remove all related packages matching the base name
 	var pkgsToRemove []string
 	found, err := getInstalledAptPackagesMatching(aptName)
 	if err == nil && len(found) > 0 {
 		pkgsToRemove = found
 	}
-	// If nothing found, just try the main package name
 	if len(pkgsToRemove) == 0 {
 		pkgsToRemove = []string{aptName}
 	}
+
+	// Debug output
+	fmt.Printf("[DEBUG] Packages to remove for '%s': %v\n", packageName, pkgsToRemove)
 
 	result := &RemovalResult{
 		PackageName:      packageName,
@@ -333,7 +341,6 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 		return result, nil
 	}
 
-	// Show warning for system packages
 	if !force {
 		fmt.Printf("⚠️  Removing APT package(s) '%s' - this may affect system stability\n", strings.Join(pkgsToRemove, ", "))
 		fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
@@ -359,87 +366,9 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 
 	result.Success = true
 	result.RemovedPaths = []string{
-		"APT packages: " + strings.Join(pkgsToRemove, ", "),
+		"APT packages: " + strings.Join(pkgsToRemove, ", ") + " (purged)",
 		"System-wide configuration files",
 	}
-
-	return result, nil
-}
-
-// removeDocker removes Docker specifically
-func (m *Manager) removeDocker(dryRun bool) (*RemovalResult, error) {
-	result := &RemovalResult{
-		PackageName:      "docker",
-		InstallationType: InstallTypeAPT,
-		Success:          false,
-	}
-
-	if dryRun {
-		result.Success = true
-		result.RemovedPaths = []string{
-			"Docker CE packages",
-			"Docker configuration files",
-			"Docker data directory",
-		}
-		return result, nil
-	}
-
-	fmt.Println("Removing Docker completely...")
-
-	// Stop and disable Docker service first
-	serviceCommands := [][]string{
-		{"sudo", "systemctl", "stop", "docker"},
-		{"sudo", "systemctl", "disable", "docker"},
-	}
-
-	for _, cmd := range serviceCommands {
-		execCmd := exec.Command(cmd[0], cmd[1:]...)
-		execCmd.Run() // Don't fail if service doesn't exist
-	}
-
-	// Remove Docker packages
-	dockerPackages := []string{
-		"docker-ce",
-		"docker-ce-cli",
-		"containerd.io",
-		"docker-buildx-plugin",
-		"docker-compose-plugin",
-		"docker.io",
-	}
-
-	// Remove each package individually
-	for _, pkg := range dockerPackages {
-		cmd := exec.Command("sudo", "apt", "remove", "--purge", pkg, "-y")
-		if err := cmd.Run(); err != nil {
-			// Don't treat individual package removal failures as errors
-			// since some packages might not be installed
-			fmt.Printf("Note: %s not found or already removed\n", pkg)
-		}
-	}
-
-	// Clean up
-	cleanupCommands := [][]string{
-		{"sudo", "apt", "autoremove", "-y"},
-		{"sudo", "rm", "-rf", "/var/lib/docker"},
-		{"sudo", "rm", "-rf", "/etc/docker"},
-		{"sudo", "rm", "-rf", "/var/run/docker.sock"},
-		{"sudo", "groupdel", "docker"},
-	}
-
-	for _, cmd := range cleanupCommands {
-		execCmd := exec.Command(cmd[0], cmd[1:]...)
-		execCmd.Run() // Don't fail on cleanup commands
-	}
-
-	result.Success = true
-	result.RemovedPaths = []string{
-		"Docker CE packages",
-		"Docker configuration files",
-		"Docker data directory",
-		"Docker socket",
-		"Docker group",
-	}
-
 	return result, nil
 }
 
@@ -538,59 +467,6 @@ func (m *Manager) removeUser(packageName string, dryRun bool) (*RemovalResult, e
 
 	result.Success = true
 	result.RemovedPaths = foundPaths
-
-	return result, nil
-}
-
-// removeVersionManager removes a package installed via version manager
-func (m *Manager) removeVersionManager(packageName string, dryRun bool) (*RemovalResult, error) {
-	result := &RemovalResult{
-		PackageName:      packageName,
-		InstallationType: InstallTypeVersion,
-		Success:          false,
-	}
-
-	// Get version manager info using centralized utility
-	info, err := GetVersionManagerInfo(packageName)
-	if err != nil {
-		result.Warning = fmt.Sprintf("No version manager installation found for '%s'", packageName)
-		return result, nil
-	}
-
-	if len(info.Paths) == 0 {
-		result.Warning = fmt.Sprintf("No version manager installation found for '%s'", packageName)
-		return result, nil
-	}
-
-	if dryRun {
-		result.Success = true
-		result.RemovedPaths = info.Paths
-		if len(info.Commands) > 0 {
-			fmt.Printf("Would execute: %s\n", strings.Join(info.Commands, "; "))
-		}
-		return result, nil
-	}
-
-	// Execute version manager commands first
-	for _, cmdStr := range info.Commands {
-		fmt.Printf("Executing: %s\n", cmdStr)
-		if err := ExecuteVersionManagerCommand(cmdStr); err != nil {
-			logger.Warn("Version manager command failed: %s - %v", cmdStr, err)
-			fmt.Printf("Warning: %s failed (continuing with file removal)\n", cmdStr)
-		}
-	}
-
-	// Remove found paths as fallback
-	for _, path := range info.Paths {
-		cmd := exec.Command("rm", "-rf", path)
-		if err := cmd.Run(); err != nil {
-			result.Error = fmt.Errorf("failed to remove %s: %w", path, err)
-			return result, result.Error
-		}
-	}
-
-	result.Success = true
-	result.RemovedPaths = info.Paths
 
 	return result, nil
 }

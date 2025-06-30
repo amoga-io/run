@@ -23,7 +23,7 @@ Features:
   • Safe package removal with rollback support
 
 Examples:
-  run install node python docker
+  run install node docker
   run install node --version 20
   run check --all
   run remove docker --force`,
@@ -46,5 +46,4 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(internalCmd)
-	rootCmd.AddCommand(envSetupCmd)
 }

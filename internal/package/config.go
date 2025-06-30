@@ -55,18 +55,6 @@ func NewConfigManager() (*ConfigManager, error) {
 func (cm *ConfigManager) loadDefaultConfigs() error {
 	// Default package configurations
 	defaultConfigs := map[string]PackageConfig{
-		"python": {
-			Name:              "python",
-			Description:       "Python programming language with pip and venv",
-			ScriptPath:        "scripts/packages/python.sh",
-			Dependencies:      []string{"build-essential", "curl"},
-			Commands:          []string{"python3", "pip3"},
-			Category:          "development",
-			VersionSupport:    true,
-			DefaultVersion:    "3.10",
-			SupportedVersions: []string{"3.8", "3.9", "3.10", "3.11", "3.12"},
-			AptPackageName:    "python3",
-		},
 		"node": {
 			Name:              "node",
 			Description:       "Node.js runtime with npm",
@@ -155,7 +143,7 @@ func (cm *ConfigManager) loadDefaultConfigs() error {
 			Name:              "essentials",
 			Description:       "System essentials and development tools",
 			ScriptPath:        "scripts/system/essentials.sh",
-			Dependencies:      []string{"gcc", "make", "redis-server", "pyenv", "nvm", "sdkman", "phpenv"},
+			Dependencies:      []string{"gcc", "make", "redis-server"},
 			Commands:          []string{"gcc", "make", "redis-server"},
 			Category:          "system",
 			VersionSupport:    false,
@@ -201,15 +189,15 @@ func (cm *ConfigManager) GetPackagesByCategory(category string) []PackageConfig 
 
 // BuildIntensivePackages returns the list of packages that benefit from build tools
 func (cm *ConfigManager) BuildIntensivePackages() []string {
-	return []string{"python", "node", "php"}
+	return []string{"node", "php"}
 }
 
 // RelatedPackages returns related package suggestions
 func (cm *ConfigManager) RelatedPackages() map[string][]string {
 	return map[string][]string{
 		"nginx":    {"php", "node"},
-		"postgres": {"python", "node", "java"},
-		"docker":   {"node", "python"},
+		"postgres": {"java"},
+		"docker":   {"node"},
 		"node":     {"pm2"},
 	}
 }

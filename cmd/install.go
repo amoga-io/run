@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/amoga-io/run/internal/logger"
@@ -14,7 +16,7 @@ var (
 	installAll     bool
 	cleanInstall   bool
 	dryRunInstall  bool
-	setActive      bool
+	listVersions   bool
 )
 
 var installCmd = &cobra.Command{
@@ -24,7 +26,6 @@ var installCmd = &cobra.Command{
 
 Supported packages:
   • node        - Node.js runtime with npm (versions: 16, 18, 20, 21)
-  • python      - Python programming language (versions: 3.8, 3.9, 3.10, 3.11, 3.12)
   • php         - PHP programming language (versions: 8.1, 8.2, 8.3)
   • java        - OpenJDK Java Development Kit (versions: 11, 17, 21)
   • docker      - Docker containerization platform
@@ -33,16 +34,11 @@ Supported packages:
   • pm2         - Process manager for Node.js applications
   • essentials  - System essentials and development tools
 
-Version manager auto-install: When installing a version-managed package (python, node, java, php), the required version manager (pyenv, nvm, sdkman, phpenv) will be automatically installed if missing.
-
---set-active flag: Use this flag to set the installed version as the active/default version in the version manager (for python, node, java, php).
-
 Examples:
-  run install node python docker
+  run install node docker
   run install node --version 20
-  run install python --version 3.10
-  run install python --version 3.10.5 --set-active
-  run install node --version 18.20.4 --set-active
+  run install php --version 8.3
+  run install node --version 18.20.4
   run install --all
   run install node --clean
   run install node --dry-run`,
@@ -51,15 +47,38 @@ Examples:
 }
 
 func init() {
-	installCmd.Flags().StringVarP(&packageVersion, "version", "v", "", "Package version to install (e.g., 18 for node, 3.10 for python)")
+	installCmd.Flags().StringVarP(&packageVersion, "version", "v", "", "Package version to install (e.g., 18 for node, 8.3 for php)")
 	installCmd.Flags().BoolVarP(&installAll, "all", "a", false, "Install all available packages")
 	installCmd.Flags().BoolVarP(&cleanInstall, "clean", "c", false, "Force clean reinstallation (remove existing first)")
 	installCmd.Flags().BoolVarP(&dryRunInstall, "dry-run", "d", false, "Show what would be installed, but do not actually install anything")
-	installCmd.Flags().BoolVarP(&setActive, "set-active", "s", false, "Set the installed version as the active/default version after install")
+	installCmd.Flags().BoolVarP(&listVersions, "list-versions", "l", false, "List all installable/supported versions for the package")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
 	log := logger.GetLogger().WithOperation("install")
+
+	if listVersions {
+		if len(args) == 0 {
+			return fmt.Errorf("Please specify a package to list versions for. Example: run install node --list-versions")
+		}
+		for _, packageName := range args {
+			pkgInfo, exists := pkg.GetPackage(packageName)
+			if !exists {
+				fmt.Printf("Package '%s' not found.\n", packageName)
+				continue
+			}
+			aptName := pkgInfo.AptPackageName
+			if aptName == "" {
+				aptName = packageName
+			}
+			fmt.Printf("Available versions for %s (via apt):\n", packageName)
+			cmd := exec.Command("apt-cache", "madison", aptName)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Run()
+		}
+		return nil
+	}
 
 	// Handle "list" command
 	if len(args) == 1 && args[0] == "list" {
@@ -136,7 +155,6 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Create installation operation function
 	installOperation := func(packageName string) error {
-		// Handle dry-run mode
 		if dryRunInstall {
 			fmt.Printf("🔍 DRY-RUN: Would install %s\n", packageName)
 			if cleanInstall {
@@ -145,53 +163,64 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			if packageVersion != "" && pkg.SupportsVersion(packageName) {
 				fmt.Printf("🔍 DRY-RUN: Would install version %s\n", packageVersion)
 			}
-			if setActive {
-				fmt.Printf("🔍 DRY-RUN: Would set version %s as active for %s\n", packageVersion, packageName)
-			}
-			return nil // Skip actual installation in dry-run mode
+			return nil
 		}
 
-		// Auto-install version manager if needed
-		if pkg.SupportsVersion(packageName) {
-			if err := pkg.EnsureVersionManagerInstalled(packageName); err != nil {
-				return fmt.Errorf("failed to install required version manager for %s: %w", packageName, err)
-			}
+		// Always purge/remove existing versions before install
+		pkgInfo, exists := pkg.GetPackage(packageName)
+		if !exists {
+			return fmt.Errorf("package '%s' not found", packageName)
 		}
+		aptName := pkgInfo.AptPackageName
+		if aptName == "" {
+			aptName = packageName
+		}
+		// Remove all installed versions (purge)
+		purgeCmd := exec.Command("sudo", "apt-get", "purge", "-y", aptName)
+		purgeCmd.Stdout = os.Stdout
+		purgeCmd.Stderr = os.Stderr
+		purgeCmd.Run() // Ignore errors if not installed
+		autoremoveCmd := exec.Command("sudo", "apt-get", "autoremove", "-y")
+		autoremoveCmd.Stdout = os.Stdout
+		autoremoveCmd.Stderr = os.Stderr
+		autoremoveCmd.Run()
 
-		// Handle clean installation
-		if cleanInstall {
-			fmt.Printf("🧹 Clean installation requested for %s\n", packageName)
-
-			// Remove existing installation first
-			result, err := manager.SafeRemovePackage(packageName, false, false)
+		// If version is specified, check if it's available
+		if packageVersion != "" && pkg.SupportsVersion(packageName) {
+			// Check if version is available in apt
+			checkCmd := exec.Command("apt-cache", "madison", aptName)
+			output, err := checkCmd.Output()
 			if err != nil {
-				log.Error("Failed to remove existing %s for clean install: %v", packageName, err)
-				return fmt.Errorf("clean installation failed - could not remove existing %s: %w", packageName, err)
+				return fmt.Errorf("failed to check available versions for %s: %w", packageName, err)
 			}
-
-			if result.Success {
-				fmt.Printf("✓ Removed existing %s for clean installation\n", packageName)
-			} else if result.Warning != "" {
-				fmt.Printf("⚠️  %s\n", result.Warning)
-			}
-		}
-
-		// Check if package supports version and version flag is provided
-		if pkg.SupportsVersion(packageName) && packageVersion != "" {
-			err := manager.InstallPackageWithArgs(packageName, []string{"--version", packageVersion})
-			if err != nil {
-				return err
-			}
-			if setActive {
-				if err := pkg.SetActiveVersion(packageName, packageVersion); err != nil {
-					return fmt.Errorf("failed to set %s version %s as active: %w", packageName, packageVersion, err)
+			available := false
+			lines := strings.Split(string(output), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, packageVersion) {
+					available = true
+					break
 				}
-				fmt.Printf("✓ Set %s version %s as active\n", packageName, packageVersion)
+			}
+			if !available {
+				return fmt.Errorf("version %s of %s is not available in apt repositories", packageVersion, packageName)
+			}
+			// Install specific version
+			installCmd := exec.Command("sudo", "apt-get", "install", "-y", fmt.Sprintf("%s=%s*", aptName, packageVersion))
+			installCmd.Stdout = os.Stdout
+			installCmd.Stderr = os.Stderr
+			if err := installCmd.Run(); err != nil {
+				return fmt.Errorf("failed to install %s version %s: %w", packageName, packageVersion, err)
 			}
 			return nil
 		}
-		// Default install
-		return manager.InstallPackageWithVersion(packageName, packageVersion)
+		// Default install (latest)
+		installCmd := exec.Command("sudo", "apt-get", "install", "-y", aptName)
+		installCmd.Stdout = os.Stdout
+		installCmd.Stderr = os.Stderr
+		if err := installCmd.Run(); err != nil {
+			return fmt.Errorf("failed to install %s: %w", packageName, err)
+		}
+		return nil
 	}
 
 	// Install packages sequentially using generic function
@@ -212,7 +241,6 @@ func showPackageListAndPrompt(action string) error {
 	// Show concise package list
 	fmt.Println("Available:")
 	fmt.Println("• node        Node.js + npm")
-	fmt.Println("• python      Python + pip + venv")
 	fmt.Println("• php         PHP 8.3 + FPM")
 	fmt.Println("• java        OpenJDK 17")
 	fmt.Println("• pm2         Process manager for Node.js")
@@ -224,7 +252,7 @@ func showPackageListAndPrompt(action string) error {
 
 	// Show usage examples
 	fmt.Println("Examples:")
-	fmt.Printf("run %s node python\n", action)
+	fmt.Printf("run %s node docker\n", action)
 	fmt.Printf("run %s java --version 17\n", action)
 	fmt.Printf("run %s essentials\n", action)
 	fmt.Printf("run %s --all\n", action)

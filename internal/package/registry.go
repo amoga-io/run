@@ -27,18 +27,6 @@ type PackageRegistry struct {
 // Global registry instance
 var globalRegistry = &PackageRegistry{
 	packages: map[string]Package{
-		"python": {
-			Name:              "python",
-			Description:       "Python programming language with pip and venv",
-			ScriptPath:        "scripts/packages/python.sh",
-			Dependencies:      []string{"build-essential", "curl"},
-			Commands:          []string{"python3", "pip3"},
-			Category:          "development",
-			VersionSupport:    true,
-			DefaultVersion:    "3.10",
-			SupportedVersions: []string{"3.8", "3.9", "3.10", "3.11", "3.12"},
-			AptPackageName:    "", // Use only pyenv, not APT
-		},
 		"node": {
 			Name:              "node",
 			Description:       "Node.js runtime with npm",
@@ -49,7 +37,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "18",
 			SupportedVersions: []string{"16", "18", "20", "21"},
-			AptPackageName:    "nodejs", // Use only nvm, not APT
+			AptPackageName:    "nodejs",
 		},
 		"docker": {
 			Name:              "docker",
@@ -95,7 +83,7 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "8.3",
 			SupportedVersions: []string{"8.1", "8.2", "8.3"},
-			AptPackageName:    "", // Use only phpenv, not APT
+			AptPackageName:    "php",
 		},
 		"java": {
 			Name:              "java",
@@ -107,24 +95,25 @@ var globalRegistry = &PackageRegistry{
 			VersionSupport:    true,
 			DefaultVersion:    "17",
 			SupportedVersions: []string{"11", "17", "21"},
-			AptPackageName:    "", // Use only sdkman, not APT
+			AptPackageName:    "openjdk-17-jdk",
 		},
 		"pm2": {
 			Name:              "pm2",
 			Description:       "Process manager for Node.js applications",
 			ScriptPath:        "scripts/packages/pm2.sh",
-			Dependencies:      []string{"node"}, // Requires Node.js to be installed first
+			Dependencies:      []string{"node"},
 			Commands:          []string{"pm2"},
 			Category:          "development",
 			VersionSupport:    true,
 			DefaultVersion:    "latest",
 			SupportedVersions: []string{"latest", "5.3.0", "5.4.0", "5.5.0"},
+			AptPackageName:    "pm2",
 		},
 		"essentials": {
 			Name:              "essentials",
 			Description:       "System essentials and development tools",
 			ScriptPath:        "scripts/system/essentials.sh",
-			Dependencies:      []string{},
+			Dependencies:      []string{"gcc", "make", "redis-server"},
 			Commands:          []string{"gcc", "make", "redis-server"},
 			Category:          "system",
 			VersionSupport:    false,

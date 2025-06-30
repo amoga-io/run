@@ -270,6 +270,23 @@ func (m *Manager) isInstalledViaAlternatives(packageName string) bool {
 	return false
 }
 
+// getInstalledAptPackagesMatching returns a list of installed APT packages matching a pattern (e.g., "php", "postgresql", "nginx")
+func getInstalledAptPackagesMatching(pattern string) ([]string, error) {
+	cmd := exec.Command("bash", "-c", "dpkg -l | grep '^ii' | awk '{print $2}' | grep '^"+pattern+"'")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var pkgs []string
+	for _, line := range lines {
+		if line != "" {
+			pkgs = append(pkgs, line)
+		}
+	}
+	return pkgs, nil
+}
+
 // removeAPT removes a package installed via APT
 func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*RemovalResult, error) {
 	// Use AptPackageName if present
@@ -280,7 +297,7 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 	}
 
 	// Block removal of python and python3 via APT
-	if aptName == "python" || aptName == "python3" {
+	if aptName == "python" || aptName == "python3" || strings.HasPrefix(aptName, "python") {
 		result := &RemovalResult{
 			PackageName:      packageName,
 			InstallationType: InstallTypeAPT,
@@ -288,6 +305,17 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 			Warning:          "Removal of system Python (python/python3) via APT is not allowed. This is critical for system operation.",
 		}
 		return result, nil
+	}
+
+	// For all other packages, remove all related packages matching the base name
+	var pkgsToRemove []string
+	found, err := getInstalledAptPackagesMatching(aptName)
+	if err == nil && len(found) > 0 {
+		pkgsToRemove = found
+	}
+	// If nothing found, just try the main package name
+	if len(pkgsToRemove) == 0 {
+		pkgsToRemove = []string{aptName}
 	}
 
 	result := &RemovalResult{
@@ -299,25 +327,20 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 	if dryRun {
 		result.Success = true
 		result.RemovedPaths = []string{
-			fmt.Sprintf("APT package: %s", aptName),
+			"APT packages: " + strings.Join(pkgsToRemove, ", "),
 			"System-wide configuration files",
 		}
 		return result, nil
 	}
 
-	// Special handling for Docker
-	if aptName == "docker" {
-		return m.removeDocker(dryRun)
-	}
-
 	// Show warning for system packages
 	if !force {
-		fmt.Printf("\u26a0\ufe0f  Removing APT package '%s' - this may affect system stability\n", aptName)
+		fmt.Printf("⚠️  Removing APT package(s) '%s' - this may affect system stability\n", strings.Join(pkgsToRemove, ", "))
 		fmt.Printf("   Consider using '--force' if you're sure this is safe\n")
 	}
 
 	commands := [][]string{
-		{"sudo", "apt", "remove", "--purge", aptName, "-y"},
+		append([]string{"sudo", "apt", "remove", "--purge"}, append(pkgsToRemove, "-y")...),
 		{"sudo", "apt", "autoremove", "-y"},
 	}
 
@@ -336,7 +359,7 @@ func (m *Manager) removeAPT(packageName string, force bool, dryRun bool) (*Remov
 
 	result.Success = true
 	result.RemovedPaths = []string{
-		fmt.Sprintf("APT package: %s", aptName),
+		"APT packages: " + strings.Join(pkgsToRemove, ", "),
 		"System-wide configuration files",
 	}
 
